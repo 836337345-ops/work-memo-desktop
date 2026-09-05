@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import ItemEditor from './ItemEditor';
 import { api } from '../api';
@@ -14,7 +14,7 @@ const base = savedItem({ title: '原事项', content: '', categoryId: null, dueD
 const props = { item: base, categories: [], onSaved: vi.fn(), onDeleted: vi.fn(), onCancel: vi.fn() };
 
 describe('ItemEditor', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { cleanup(); vi.clearAllMocks(); });
 
   it('快速编辑时按顺序保存快照，旧响应不会覆盖最新输入', async () => {
     let firstDone!: (value: WorkItem) => void;
@@ -29,7 +29,7 @@ describe('ItemEditor', () => {
     await act(async () => { firstDone(savedItem({ ...base, title: '第一版' })); await first; });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.updateItem).mock.calls[1][1].title).toBe('最终版');
-    await waitFor(() => expect(screen.getByLabelText(/事项标题/)).toHaveValue('最终版'));
+    await waitFor(() => expect((screen.getByLabelText(/事项标题/) as HTMLInputElement).value).toBe('最终版'));
   });
 
   it('保存失败保留输入，并可显式重试', async () => {
@@ -37,7 +37,7 @@ describe('ItemEditor', () => {
     render(<ItemEditor {...props} />);
     fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '仍要保留' } });
     await screen.findByRole('alert');
-    expect(screen.getByLabelText(/事项标题/)).toHaveValue('仍要保留');
+    expect((screen.getByLabelText(/事项标题/) as HTMLInputElement).value).toBe('仍要保留');
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.updateItem).mock.calls[1][1].title).toBe('仍要保留');
