@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchesDateFilter, sortByDueDate } from './filters';
+import { filterItems, isOverdue, matchesDateFilter, sortByDueDate } from './filters';
 import type { WorkItem } from '../types';
 
 const item = (dueDate: string | null, status: WorkItem['status'] = 'todo', createdAt = '2026-01-01T00:00:00Z'): WorkItem => ({
@@ -24,5 +24,19 @@ describe('日期筛选', () => {
     const sorted = sortByDueDate([item(null), item('2026-09-14', 'todo', '2026-01-01T00:00:00Z'), item('2026-09-14', 'todo', '2026-02-01T00:00:00Z'), item('2026-09-13')]);
     expect(sorted.map((entry) => entry.dueDate)).toEqual(['2026-09-13', '2026-09-14', '2026-09-14', null]);
     expect(sorted[1].createdAt).toBe('2026-02-01T00:00:00Z');
+  });
+
+  it('可组合分类、状态与日期条件', () => {
+    const matched = item('2026-09-13', 'doing'); matched.categoryId = 'promotion';
+    const wrongStatus = item('2026-09-13', 'todo'); wrongStatus.categoryId = 'promotion';
+    const wrongCategory = item('2026-09-13', 'doing'); wrongCategory.categoryId = 'package';
+    expect(filterItems([matched, wrongStatus, wrongCategory], { dateFilter: 'today', categoryId: 'promotion', status: 'doing', today: '2026-09-13' })).toEqual([matched]);
+  });
+
+  it('仅待开展和进行中的过期事项显示为逾期', () => {
+    expect(isOverdue(item('2026-09-12', 'todo'), '2026-09-13')).toBe(true);
+    expect(isOverdue(item('2026-09-12', 'doing'), '2026-09-13')).toBe(true);
+    expect(isOverdue(item('2026-09-12', 'done'), '2026-09-13')).toBe(false);
+    expect(isOverdue(item('2026-09-12', 'paused'), '2026-09-13')).toBe(false);
   });
 });

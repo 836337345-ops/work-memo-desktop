@@ -1,4 +1,5 @@
 import { STATUS_LABELS, type Category, type WorkItem } from '../../types';
+import { isOverdue } from '../../lib/filters';
 
 interface ItemListProps {
   items: WorkItem[];
@@ -17,8 +18,8 @@ export function ItemList({ items, categories, selectedId, onSelect, onRestore }:
     {items.map((item) => <li key={item.id} className={item.id === selectedId ? 'item-row selected' : 'item-row'}>
       <button className="item-main" onClick={() => onSelect(item)}>
         <span className={`status-dot ${item.status}`} aria-hidden="true" />
-        <span className="item-copy"><strong>{item.title}</strong><small>{categoryName(item.categoryId)} · {STATUS_LABELS[item.status]}</small></span>
-        <time className={item.dueDate ? '' : 'muted'}>{formatDate(item.dueDate)}</time>
+        <span className="item-copy"><strong>{item.title}</strong><small>{categoryName(item.categoryId)} · {STATUS_LABELS[item.status]}</small>{item.progress[0] && <small className="progress-preview">最新进度：{item.progress[0].content}</small>}</span>
+        <span className="item-date"><time className={item.dueDate ? '' : 'muted'}>{formatDate(item.dueDate)}</time>{isOverdue(item) && <em className="overdue-label">逾期</em>}</span>
       </button>
       {onRestore && <button className="restore-button" onClick={() => onRestore(item)}>还原</button>}
     </li>)}
