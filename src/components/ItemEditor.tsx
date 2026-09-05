@@ -34,6 +34,7 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
   const [progress, setProgress] = useState(() => item?.progress ?? []);
   const [progressText, setProgressText] = useState('');
   const [savingCount, setSavingCount] = useState(0);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [progressSaving, setProgressSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,22 +59,26 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
     setProgress(item?.progress ?? []);
     setProgressText('');
     setError(null);
+    setSaveFailed(false);
     failedSaveRef.current = false;
   }, [item?.id]); // 切换事项才重置，不能依赖 updatedAt
 
   const enqueueUpdate = useCallback((id: string, input: ItemInput) => {
     failedSaveRef.current = false;
+    setSaveFailed(false);
     setError(null);
     setSavingCount((count) => count + 1);
     const run = async (): Promise<boolean> => {
       try {
         const saved = await api.updateItem(id, input);
         failedSaveRef.current = false;
+        setSaveFailed(false);
         setError(null);
         onSavedRef.current(saved);
         return true;
       } catch (reason) {
         failedSaveRef.current = true;
+        setSaveFailed(true);
         setError(reason instanceof Error ? reason.message : '保存失败，请重试。');
         return false;
       } finally {
@@ -190,7 +195,7 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
           <p className="item-editor__eyebrow">{itemId ? '事项详情' : '新建事项'}</p>
           <h2>{itemId ? '推进下一步' : '记录一件要紧的事'}</h2>
         </div>
-        {itemId && !deleted && <span className="item-editor__save-state">{savingCount ? '正在保存…' : '已自动保存'}</span>}
+        {itemId && !deleted && <span className="item-editor__save-state">{savingCount ? '正在保存…' : saveFailed ? '保存失败' : '已自动保存'}</span>}
       </div>
 
       {deleted && <p className="item-editor__readonly">此事项位于回收站，仅供查看。恢复请在回收站中操作。</p>}
