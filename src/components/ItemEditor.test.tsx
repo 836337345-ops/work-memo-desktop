@@ -38,10 +38,13 @@ describe('ItemEditor', () => {
     render(<ItemEditor {...props} />);
     fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '仍要保留' } });
     await screen.findByRole('alert');
+    expect(screen.getByText('保存失败')).toBeTruthy();
+    expect(screen.queryByText('已自动保存')).toBeNull();
     expect((screen.getByLabelText(/事项标题/) as HTMLInputElement).value).toBe('仍要保留');
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.updateItem).mock.calls[1][1].title).toBe('仍要保留');
+    await waitFor(() => expect(screen.getByText('已自动保存')).toBeTruthy());
   });
 
   it('进度单独提交并显示最新历史', async () => {
