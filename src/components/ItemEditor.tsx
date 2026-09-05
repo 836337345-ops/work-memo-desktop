@@ -13,12 +13,23 @@ const makeFollowUp = (): FollowUp => ({
   done: false,
 });
 
+/** 后端的更新输入严格禁止 WorkItem 的系统字段，不能直接传递列表数据。 */
+const toInput = (item: ItemInput): ItemInput => ({
+  title: item.title,
+  content: item.content,
+  categoryId: item.categoryId,
+  dueDate: item.dueDate,
+  status: item.status,
+  notes: item.notes,
+  followUps: item.followUps.map((followUp) => ({ ...followUp })),
+});
+
 /** 事项编辑器自行串行保存，避免输入很快时较早请求覆盖较晚内容。 */
 const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor(
   { item, categories, defaultCategoryId = null, onSaved, onDeleted, onCancel },
   ref,
 ) {
-  const [draft, setDraft] = useState<ItemInput>(() => item ?? emptyItem(defaultCategoryId));
+  const [draft, setDraft] = useState<ItemInput>(() => item ? toInput(item) : emptyItem(defaultCategoryId));
   const [itemId, setItemId] = useState<string | null>(item?.id ?? null);
   const [progress, setProgress] = useState(() => item?.progress ?? []);
   const [progressText, setProgressText] = useState('');
@@ -39,7 +50,7 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
 
   // 父组件只会更新列表数据；同一事项不能用较旧的 props 覆盖正在编辑的草稿。
   useEffect(() => {
-    const next = item ?? emptyItem(defaultCategoryId);
+    const next = item ? toInput(item) : emptyItem(defaultCategoryId);
     setDraft(next);
     draftRef.current = next;
     setItemId(item?.id ?? null);
@@ -97,8 +108,9 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
       const saved = await api.createItem({ ...input, title: input.title.trim() });
       setItemId(saved.id);
       itemIdRef.current = saved.id;
-      setDraft(saved);
-      draftRef.current = saved;
+      const createdInput = toInput(saved);
+      setDraft(createdInput);
+      draftRef.current = createdInput;
       setProgress(saved.progress);
       failedSaveRef.current = false;
       onSavedRef.current(saved);
