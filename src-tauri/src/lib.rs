@@ -1,7 +1,7 @@
 use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs, io::Write, path::{Path, PathBuf}};
+use std::{collections::HashSet, fs, io::Write, path::{Path, PathBuf}, time::Duration};
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
@@ -33,7 +33,7 @@ struct Store { c:Connection }
 fn fail(s:&str)->String { s.to_string() }
 fn stamp()->String { Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true) }
 fn check_id(id:&str, label:&str)->R<()> { if id.trim().is_empty() || id.len()>128 {Err(format!("{label}标识无效。"))}else{Ok(())} }
-fn text(s:&str,label:&str,max:usize,required:bool)->R<String>{if s.len()>max{Err(format!("{label}不能超过 {max} 个字符。"))}else if required&&s.trim().is_empty(){Err(format!("{label}不能为空。"))}else{Ok(if required{s.trim().into()}else{s.into()})}}
+fn text(s:&str,label:&str,max:usize,required:bool)->R<String>{if s.chars().count()>max{Err(format!("{label}不能超过 {max} 个字符。"))}else if required&&s.trim().is_empty(){Err(format!("{label}不能为空。"))}else{Ok(if required{s.trim().into()}else{s.into()})}}
 fn valid_input(v:&Input)->R<Input>{
  text(&v.title,"事项标题",200,true)?; text(&v.content,"事项内容",20000,false)?; text(&v.notes,"备注",20000,false)?;
  if !matches!(v.status.as_str(),"todo"|"doing"|"done"|"paused"){return Err(fail("事项状态无效。"))}
@@ -50,6 +50,7 @@ impl Store {
  fn open(path:PathBuf)->R<Self>{
   fs::create_dir_all(path.parent().ok_or_else(||fail("数据目录无效。"))?).map_err(|_|fail("无法创建本地数据目录。"))?;
   let mut c=Connection::open(path).map_err(|_|fail("无法打开本地数据库。"))?;
+  c.busy_timeout(Duration::from_secs(5)).map_err(|_|fail("无法设置本地数据库等待时间。"))?;
   c.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
  CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS categories(id TEXT PRIMARY KEY,name TEXT NOT NULL COLLATE NOCASE UNIQUE,sort_order INTEGER NOT NULL);

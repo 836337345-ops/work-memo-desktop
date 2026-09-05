@@ -39,4 +39,9 @@ describe('日期筛选', () => {
     expect(isOverdue(item('2026-09-12', 'done'), '2026-09-13')).toBe(false);
     expect(isOverdue(item('2026-09-12', 'paused'), '2026-09-13')).toBe(false);
   });
+
+  it('下月筛选能跨越年份', () => {
+    expect(matchesDateFilter(item('2027-01-01'), 'nextMonth', '2026-12-15')).toBe(true);
+    expect(matchesDateFilter(item('2026-12-31'), 'nextMonth', '2026-12-15')).toBe(false);
+  });
 });
