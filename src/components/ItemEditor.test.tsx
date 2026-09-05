@@ -29,6 +29,7 @@ describe('ItemEditor', () => {
     await act(async () => { firstDone(savedItem({ ...base, title: '第一版' })); await first; });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.updateItem).mock.calls[1][1].title).toBe('最终版');
+    expect(Object.keys(vi.mocked(api.updateItem).mock.calls[1][1]).sort()).toEqual(['categoryId', 'content', 'dueDate', 'followUps', 'notes', 'status', 'title']);
     await waitFor(() => expect(screen.getByLabelText(/事项标题/)).toHaveValue('最终版'));
   });
 
@@ -51,6 +52,19 @@ describe('ItemEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '提交进度' }));
     await waitFor(() => expect(api.addProgress).toHaveBeenCalledWith('item-1', '已联系供应商'));
     expect(await screen.findByText('已联系供应商')).toBeTruthy();
+  });
+
+  it('创建成功后继续编辑时只提交普通字段', async () => {
+    const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'todo' as const, notes: '', followUps: [] };
+    vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
+    vi.mocked(api.updateItem).mockImplementation(async (_id, next) => savedItem(next));
+    render(<ItemEditor {...props} item={null} />);
+    fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } });
+    fireEvent.click(screen.getByRole('button', { name: '创建事项' }));
+    await waitFor(() => expect(api.createItem).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项（已更新）' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalled());
+    expect(Object.keys(vi.mocked(api.updateItem).mock.calls[0][1]).sort()).toEqual(['categoryId', 'content', 'dueDate', 'followUps', 'notes', 'status', 'title']);
   });
 
   it('跟进支持新增、编辑、勾选和删除，并自动保存', async () => {
