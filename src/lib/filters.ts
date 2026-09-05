@@ -1,9 +1,11 @@
-import type { WorkItem } from '../types';
+import type { ItemStatus, WorkItem } from '../types';
 
 export type DateFilter = 'all' | 'today' | 'thisWeek' | 'nextWeek' | 'thisMonth' | 'nextMonth' | 'overdue' | 'noDate' | 'custom';
 
 export interface FilterOptions {
   dateFilter: DateFilter;
+  categoryId?: string | null;
+  status?: ItemStatus | 'all';
   customStart?: string;
   customEnd?: string;
   query?: string;
@@ -54,6 +56,10 @@ export function matchesDateFilter(item: WorkItem, filter: DateFilter, today = fo
   }
 }
 
+export function isOverdue(item: WorkItem, today = formatLocalDate(new Date())) {
+  return item.dueDate !== null && item.dueDate < today && (item.status === 'todo' || item.status === 'doing');
+}
+
 export function searchItems(items: WorkItem[], query = '') {
   const term = query.trim().toLocaleLowerCase();
   if (!term) return items;
@@ -73,6 +79,8 @@ export function sortByDueDate(items: WorkItem[]) {
 
 export function filterItems(items: WorkItem[], options: FilterOptions) {
   return sortByDueDate(searchItems(items, options.query).filter((item) =>
-    matchesDateFilter(item, options.dateFilter, options.today, options.customStart, options.customEnd),
+    (options.categoryId === undefined || item.categoryId === options.categoryId)
+    && (!options.status || options.status === 'all' || item.status === options.status)
+    && matchesDateFilter(item, options.dateFilter, options.today, options.customStart, options.customEnd),
   ));
 }
