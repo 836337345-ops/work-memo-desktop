@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
-import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemStatus, type WorkItem } from '../../types';
+import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
 import { isOverdue } from '../../lib/filters';
 
 interface ItemListProps {
@@ -11,6 +11,7 @@ interface ItemListProps {
   onChanged?: (item: WorkItem) => void;
   onError?: (message: string) => void;
   onRestore?: (item: WorkItem) => void;
+  editingItemId?: string | null;
 }
 
 const formatDate = (value: string | null) => value ? value.replaceAll('-', '.') : '未设日期';
@@ -18,9 +19,11 @@ const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: i
 const newFollowUp = (): FollowUp => ({ id: globalThis.crypto?.randomUUID?.() ?? `follow-${Date.now()}-${Math.random().toString(16).slice(2)}`, text: '', done: false });
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : '保存失败，请重试。';
 
-function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore }: {
+interface CardHandle { prepareLeave: () => Promise<boolean> }
+
+function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister }: {
   item: WorkItem; categoryName: string; selected: boolean; readOnly: boolean; onSelect: () => void;
-  onChanged?: (item: WorkItem) => void; onError?: (message: string) => void; onRestore?: () => void;
+  onChanged?: (item: WorkItem) => void; onError?: (message: string) => void; onRestore?: () => void; onRegister: (handle: CardHandle | null) => void;
 }) {
   const [draft, setDraft] = useState<ItemInput>(() => toInput(item));
   const [progress, setProgress] = useState(item.progress);
@@ -30,9 +33,12 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const [saveError, setSaveError] = useState<string | null>(null);
   const draftRef = useRef(draft);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
+  const progressChainRef = useRef<Promise<void>>(Promise.resolve());
   const progressTextRef = useRef(progressText);
   const ownItemIdRef = useRef(item.id);
   const ownUpdateAtRef = useRef(item.updatedAt);
+  const normalFailedRef = useRef(false);
+  const progressFailedRef = useRef(false);
 
   useEffect(() => { progressTextRef.current = progressText; }, [progressText]);
   // 自身保存的回传不应覆盖仍在输入的草稿；详情编辑器等外部更新则需要刷新卡片。
@@ -44,12 +50,16 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     setProgress(item.progress);
     setProgressText('');
     setSaveError(null);
+    normalFailedRef.current = false;
+    progressFailedRef.current = false;
     ownItemIdRef.current = item.id;
     ownUpdateAtRef.current = item.updatedAt;
   }, [item.id, item.updatedAt]);
 
-  const reportFailure = (reason: unknown) => {
+  const reportFailure = (reason: unknown, kind: 'normal' | 'progress') => {
     const message = errorText(reason);
+    if (kind === 'normal') normalFailedRef.current = true;
+    else progressFailedRef.current = true;
     setSaveError(message);
     onError?.(message);
   };
@@ -59,20 +69,23 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     setDraft(next);
     if (!next.title.trim()) {
       const message = '事项标题不能为空。';
+      normalFailedRef.current = true;
       setSaveError(message);
       onError?.(message);
       return;
     }
+    normalFailedRef.current = false;
     setSaveError(null);
     setSaving((count) => count + 1);
     const save = async () => {
       try {
         const saved = await api.updateItem(item.id, next);
         ownUpdateAtRef.current = saved.updatedAt;
+        normalFailedRef.current = false;
         setSaveError(null);
         onChanged?.(saved);
       } catch (reason) {
-        reportFailure(reason);
+        reportFailure(reason, 'normal');
       } finally {
         setSaving((count) => Math.max(0, count - 1));
       }
@@ -83,28 +96,39 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const update = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => enqueueUpdate({ ...draftRef.current, [field]: value });
   const updateFollowUps = (followUps: FollowUp[]) => update('followUps', followUps);
 
-  const submitProgress = async () => {
+  const submitProgress = () => {
     const content = progressTextRef.current.trim();
     if (!content || progressSaving) return;
     setProgressText('');
     progressTextRef.current = '';
     setProgressSaving(true);
     setSaveError(null);
-    try {
-      const saved = await api.addProgress(item.id, content);
-      ownUpdateAtRef.current = saved.updatedAt;
-      setProgress(saved.progress);
-      onChanged?.(saved);
-    } catch (reason) {
-      if (!progressTextRef.current) {
-        setProgressText(content);
-        progressTextRef.current = content;
+    progressFailedRef.current = false;
+    const save = async () => {
+      try {
+        const saved = await api.addProgress(item.id, content);
+        ownUpdateAtRef.current = saved.updatedAt;
+        progressFailedRef.current = false;
+        setProgress(saved.progress);
+        onChanged?.(saved);
+      } catch (reason) {
+        if (!progressTextRef.current) {
+          setProgressText(content);
+          progressTextRef.current = content;
+        }
+        reportFailure(reason, 'progress');
+      } finally {
+        setProgressSaving(false);
       }
-      reportFailure(reason);
-    } finally {
-      setProgressSaving(false);
-    }
+    };
+    progressChainRef.current = save();
   };
+
+  const prepareLeave = useCallback(async () => {
+    await Promise.all([writeChainRef.current, progressChainRef.current]);
+    return !normalFailedRef.current && !progressFailedRef.current;
+  }, []);
+  useEffect(() => { onRegister({ prepareLeave }); return () => onRegister(null); }, [onRegister, prepareLeave]);
 
   return <li className={selected ? 'item-row selected' : 'item-row'}>
     <article className="item-card" aria-label={`事项：${item.title}`}>
@@ -112,7 +136,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
         <span className={`status-dot ${draft.status}`} aria-hidden="true" />
         <div className="item-copy"><strong>{item.title}</strong><small>{categoryName} · 截止 {formatDate(item.dueDate)}</small></div>
         {isOverdue(item) && <em className="overdue-label">逾期</em>}
-        {readOnly ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
+        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
       <div className="item-card__body">
         <label><b>事项标题</b><input aria-label={`${item.title}的标题`} value={draft.title} disabled={readOnly} onChange={(event) => update('title', event.target.value)} /></label>
@@ -130,10 +154,19 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   </li>;
 }
 
-export function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore }: ItemListProps) {
+export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore, editingItemId = null }, ref) {
+  const cardHandlesRef = useRef(new Map<string, CardHandle>());
+  const registerCard = useCallback((id: string, handle: CardHandle | null) => {
+    if (handle) cardHandlesRef.current.set(id, handle);
+    else cardHandlesRef.current.delete(id);
+  }, []);
+  useImperativeHandle(ref, () => ({ prepareLeave: async () => {
+    const results = await Promise.all([...cardHandlesRef.current.values()].map((handle) => handle.prepareLeave()));
+    return results.every(Boolean);
+  } }), []);
   const categoryName = (id: string | null) => categories.find((category) => category.id === id)?.name ?? '未分类';
   if (!items.length) return <div className="empty-state"><span>☷</span><h2>这里还没有事项</h2><p>{onRestore ? '回收站为空。删除的事项会暂存在这里。' : '新建一条事项，开始安排接下来的工作。'}</p></div>;
   return <ul className="item-list" aria-label="事项列表">
-    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore)} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} />)}
+    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore) || item.id === editingItemId} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} onRegister={(handle) => registerCard(item.id, handle)} />)}
   </ul>;
-}
+});

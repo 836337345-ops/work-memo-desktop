@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../api';
 import { ItemList } from './ItemList';
-import type { ItemInput, WorkItem } from '../../types';
+import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
 
 vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn() } }));
 
@@ -93,5 +94,40 @@ describe('事项卡内联编辑', () => {
     expect(screen.getByLabelText('联系客户的备注').hasAttribute('disabled')).toBe(true);
     fireEvent.click(screen.getByRole('button', { name: '还原' }));
     expect(onRestore).toHaveBeenCalled();
+  });
+
+  it('离开保护会等待延迟保存完成，完成后才允许切换', async () => {
+    let resolveSave!: (item: WorkItem) => void;
+    vi.mocked(api.updateItem).mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveSave = resolve; }));
+    const ref = createRef<ItemListHandle>();
+    render(<ItemList {...props()} ref={ref} />);
+    fireEvent.change(screen.getByLabelText('联系客户的备注'), { target: { value: '等待写入完成' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
+    const leave = ref.current?.prepareLeave();
+    let settled = false;
+    void leave?.then(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    resolveSave(saved({ ...base, notes: '等待写入完成' }));
+    expect(await leave).toBe(true);
+  });
+
+  it('保存失败会阻止切换并保留卡片输入', async () => {
+    vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('写入失败'));
+    const ref = createRef<ItemListHandle>();
+    render(<ItemList {...props()} ref={ref} />);
+    const notes = screen.getByLabelText('联系客户的备注') as HTMLTextAreaElement;
+    fireEvent.change(notes, { target: { value: '保留失败草稿' } });
+    await screen.findByRole('alert');
+    expect(notes.value).toBe('保留失败草稿');
+    expect(await ref.current?.prepareLeave()).toBe(false);
+  });
+
+  it('详情编辑器已打开时将同一事项卡片设为只读', () => {
+    render(<ItemList {...props()} editingItemId="one" />);
+    expect(screen.getByLabelText('联系客户的标题').hasAttribute('disabled')).toBe(true);
+    expect(screen.getByLabelText('联系客户的状态').hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByRole('button', { name: '一键完成' })).toBeNull();
+    expect(screen.getByLabelText('详情编辑中')).toBeTruthy();
   });
 });
