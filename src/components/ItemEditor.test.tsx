@@ -5,12 +5,12 @@ import ItemEditor from './ItemEditor';
 import { api } from '../api';
 import type { FollowUpTemplate, ItemInput, WorkItem } from '../types';
 
-vi.mock('../api', () => ({ api: { createItem: vi.fn(), updateItem: vi.fn(), addProgress: vi.fn(), trashItem: vi.fn(), listFollowUpTemplates: vi.fn(), createFollowUpTemplate: vi.fn(), updateFollowUpTemplate: vi.fn(), deleteFollowUpTemplate: vi.fn() } }));
+vi.mock('../api', () => ({ api: { createItem: vi.fn(), updateItem: vi.fn(), trashItem: vi.fn(), listFollowUpTemplates: vi.fn(), createFollowUpTemplate: vi.fn(), updateFollowUpTemplate: vi.fn(), deleteFollowUpTemplate: vi.fn() } }));
 const savedItem = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem => ({ ...input, id: 'item-1', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, progress: [], ...overrides });
 const base = savedItem({ title: '原事项', content: '', categoryId: null, dueDate: null, status: 'todo', notes: '', followUps: [] });
 const props = { item: base, categories: [], onSaved: vi.fn(), onDeleted: vi.fn(), onCancel: vi.fn() };
 
-describe('V2.2 ItemEditor', () => {
+describe('V2.3 ItemEditor', () => {
   beforeEach(() => { cleanup(); vi.clearAllMocks(); vi.mocked(api.listFollowUpTemplates).mockResolvedValue([]); vi.spyOn(window, 'confirm').mockReturnValue(true); });
   afterEach(() => vi.restoreAllMocks());
 
@@ -37,9 +37,12 @@ describe('V2.2 ItemEditor', () => {
     await waitFor(() => expect(api.createItem).toHaveBeenCalled()); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
   });
 
-  it('进度单独提交并保留历史，不触发编辑栏关闭', async () => {
-    const withProgress = savedItem(base, { progress: [{ id: 'p1', content: '已联系供应商', createdAt: '2026-09-02T08:00:00Z' }] }); vi.mocked(api.addProgress).mockResolvedValue(withProgress);
-    render(<ItemEditor {...props} />); fireEvent.change(screen.getByLabelText('新的进度'), { target: { value: '已联系供应商' } }); fireEvent.click(screen.getByRole('button', { name: '提交进度' })); await waitFor(() => expect(api.addProgress).toHaveBeenCalledWith('item-1', '已联系供应商')); expect(screen.getByText('已联系供应商')).toBeTruthy(); expect(props.onCancel).not.toHaveBeenCalled();
+  it('只显示约定的编辑字段，隐藏状态和进度记录，但保存时保留既有状态', async () => {
+    vi.mocked(api.updateItem).mockImplementation(async (_id, input) => savedItem(input));
+    render(<ItemEditor {...props} />);
+    expect(screen.getByLabelText('事项情况')).toBeTruthy(); expect(screen.queryByLabelText('当前状态')).toBeNull(); expect(screen.queryByLabelText('新的进度')).toBeNull(); expect(screen.queryByText('进度记录')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledWith('item-1', expect.objectContaining({ status: 'todo' })));
   });
 
   it('只展示当前类别模板，应用时按 trim 后文字跳过重复项', async () => {
