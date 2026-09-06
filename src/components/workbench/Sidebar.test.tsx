@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 
 const setup = () => {
-  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn() };
+  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onOpenCalendar: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn() };
   render(<Sidebar {...props} />);
   return props;
 };
@@ -38,5 +38,11 @@ describe('V2 工作台导航', () => {
     expect(button.className).toContain('sidebar-show-all');
     fireEvent.click(button);
     expect(props.onShowAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('提供工作日历入口', () => {
+    const props = setup();
+    fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
+    expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
   });
 });
