@@ -22,7 +22,7 @@ describe('事项卡内联编辑', () => {
     expect(screen.getByText('联系客户')).toBeTruthy();
     expect((screen.getByLabelText('联系客户的情况') as HTMLTextAreaElement).value).toBe('确认本周合作方案');
     expect(screen.getByText('今日已联系客户')).toBeTruthy();
-    expect(screen.getByText('确认联系人')).toBeTruthy();
+    expect((screen.getByLabelText('跟进内容') as HTMLInputElement).value).toBe('确认联系人');
     expect((screen.getByLabelText('联系客户的备注') as HTMLTextAreaElement).value).toBe('优先电话沟通');
     expect(screen.getByText('逾期')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '修改编辑' }));
