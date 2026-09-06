@@ -18,5 +18,7 @@ export interface WorkItemsExportInput {
 export interface WorkItemsExportResult { path: string; itemCount: number; categoryCount: number }
 export interface AppInfo { dataDir: string; version: string }
 export interface EditorHandle { prepareLeave: () => Promise<boolean> }
+/** 列表卡片内联保存的离开保护，供工作台在切换视图前统一等待。 */
+export interface ItemListHandle { prepareLeave: () => Promise<boolean> }
 export interface ItemEditorProps { item: WorkItem | null; categories: Category[]; defaultCategoryId?: string | null; onSaved: (item: WorkItem) => void; onDeleted: (id: string) => void; onCancel: () => void }
 export const emptyItem = (categoryId: string | null = null): ItemInput => ({ title: '', content: '', categoryId, dueDate: null, status: 'todo', notes: '', followUps: [] });
