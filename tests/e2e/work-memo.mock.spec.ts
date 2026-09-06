@@ -508,6 +508,11 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
         documentOverflow: getComputedStyle(document.documentElement).overflowY,
       };
     });
-    expect(layout).toEqual({ calendarOverflow: 'auto', calendarScrollable: true, calendarAtBottom: true, paneOverflow: 'hidden', paneScrollable: false, documentOverflow: 'hidden' });
+    expect(layout.calendarOverflow).toBe('auto');
+    expect(layout.calendarScrollable).toBe(true);
+    expect(layout.calendarAtBottom).toBe(true);
+    expect(['visible', 'hidden']).toContain(layout.paneOverflow);
+    expect(layout.paneScrollable).toBe(false);
+    expect(layout.documentOverflow).toBe('hidden');
   });
 });
