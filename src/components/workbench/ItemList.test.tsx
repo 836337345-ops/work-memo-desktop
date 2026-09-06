@@ -21,25 +21,28 @@ describe('事项卡内联编辑', () => {
     const next = props();
     render(<ItemList {...next} />);
     expect(screen.getByText('联系客户')).toBeTruthy();
-    expect((screen.getByLabelText('联系客户的情况') as HTMLTextAreaElement).value).toBe('确认本周合作方案');
+    expect(screen.getByText('确认本周合作方案')).toBeTruthy();
     expect(screen.getByText('今日已联系客户')).toBeTruthy();
     expect((screen.getByLabelText('跟进内容') as HTMLInputElement).value).toBe('确认联系人');
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     expect((screen.getByLabelText('联系客户的备注') as HTMLTextAreaElement).value).toBe('优先电话沟通');
     expect(screen.getByText('逾期')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '修改编辑' }));
     expect(next.onSelect).toHaveBeenCalledWith(base);
   });
 
-  it('可提交进度、编辑备注和跟进、修改状态及一键完成', async () => {
+  it('可提交进度、编辑备注和跟进、修改状态', async () => {
     const next = props();
     vi.mocked(api.addProgress).mockResolvedValue(saved(base, { progress: [{ id: 'p2', content: '报价已发送', createdAt: '2026-01-02T00:00:00Z' }, ...base.progress] }));
     render(<ItemList {...next} />);
 
+    fireEvent.click(screen.getByRole('button', { name: '今日已联系客户' }));
     fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '报价已发送' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
     await waitFor(() => expect(api.addProgress).toHaveBeenCalledWith('one', '报价已发送'));
     expect(await screen.findByText('报价已发送')).toBeTruthy();
 
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     fireEvent.change(screen.getByLabelText('联系客户的备注'), { target: { value: '改为下午联系' } });
     fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '确认最终联系人' } });
     fireEvent.click(screen.getByLabelText('完成：确认最终联系人'));
@@ -48,24 +51,33 @@ describe('事项卡内联编辑', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '删除跟进' })[0]);
 
     fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'doing' } });
-    fireEvent.click(screen.getByRole('button', { name: '一键完成' }));
+    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'done' } });
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.status === 'done')).toBe(true));
     expect(next.onChanged).toHaveBeenCalled();
   });
 
-  it('可直接编辑标题和情况，空白标题不会发起保存', async () => {
+  it('列表标题和情况只读，详情编辑入口负责修改', () => {
     const next = props();
     render(<ItemList {...next} />);
-    fireEvent.change(screen.getByLabelText('联系客户的标题'), { target: { value: '联系重点客户' } });
-    fireEvent.change(screen.getByLabelText('联系客户的情况'), { target: { value: '确认本周报价和交期' } });
-    await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.title === '联系重点客户')).toBe(true));
-    await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.content === '确认本周报价和交期')).toBe(true));
+    expect(screen.queryByLabelText('联系客户的标题')).toBeNull();
+    expect(screen.queryByLabelText('联系客户的情况')).toBeNull();
+    expect(screen.getByText('确认本周合作方案')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '修改编辑' }));
+    expect(next.onSelect).toHaveBeenCalledWith(base);
+  });
 
-    vi.mocked(api.updateItem).mockClear();
-    fireEvent.change(screen.getByLabelText('联系客户的标题'), { target: { value: '   ' } });
-    expect((screen.getByLabelText('联系客户的标题') as HTMLInputElement).value).toBe('   ');
-    expect((await screen.findByRole('alert')).textContent).toContain('事项标题不能为空');
-    expect(api.updateItem).not.toHaveBeenCalled();
+  it('跟进默认最多展示三条，可展开和收起，状态灯按状态区分', () => {
+    const many = { ...base, followUps: [
+      { id: 'f1', text: '第一项', done: false }, { id: 'f2', text: '第二项', done: false },
+      { id: 'f3', text: '第三项', done: false }, { id: 'f4', text: '第四项', done: false },
+    ] };
+    const { container } = render(<ItemList items={[many]} categories={categories} selectedId={null} onSelect={vi.fn()} />);
+    expect(screen.getAllByLabelText('跟进内容')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: '展开全部（4）' }));
+    expect(screen.getAllByLabelText('跟进内容')).toHaveLength(4);
+    fireEvent.click(screen.getByRole('button', { name: '收起跟进' }));
+    expect(screen.getAllByLabelText('跟进内容')).toHaveLength(3);
+    expect(container.querySelector('.status-dot.todo')).toBeTruthy();
   });
 
   it('详情编辑器回传同一事项的新版本时同步最新进度与状态', () => {
@@ -81,6 +93,7 @@ describe('事项卡内联编辑', () => {
     const next = props();
     vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('本地数据库暂不可写'));
     render(<ItemList {...next} />);
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     const notes = screen.getByLabelText('联系客户的备注');
     fireEvent.change(notes, { target: { value: '不要丢失这段备注' } });
     expect((notes as HTMLTextAreaElement).value).toBe('不要丢失这段备注');
@@ -91,7 +104,7 @@ describe('事项卡内联编辑', () => {
     const onRestore = vi.fn();
     render(<ItemList items={[{ ...base, deletedAt: '2026-01-03T00:00:00Z' }]} categories={categories} selectedId={null} onSelect={vi.fn()} onRestore={onRestore} />);
     expect(screen.queryByRole('button', { name: '一键完成' })).toBeNull();
-    expect(screen.getByLabelText('联系客户的备注').hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByLabelText('联系客户的备注')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '还原' }));
     expect(onRestore).toHaveBeenCalled();
   });
@@ -101,6 +114,7 @@ describe('事项卡内联编辑', () => {
     vi.mocked(api.updateItem).mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveSave = resolve; }));
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     fireEvent.change(screen.getByLabelText('联系客户的备注'), { target: { value: '等待写入完成' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
     const leave = ref.current?.prepareLeave();
@@ -120,6 +134,7 @@ describe('事项卡内联编辑', () => {
       .mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveB = resolve; }));
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     const notes = screen.getByLabelText('联系客户的备注');
     fireEvent.change(notes, { target: { value: '保存 A' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
@@ -139,6 +154,7 @@ describe('事项卡内联编辑', () => {
     vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('写入失败'));
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     const notes = screen.getByLabelText('联系客户的备注') as HTMLTextAreaElement;
     fireEvent.change(notes, { target: { value: '保留失败草稿' } });
     await screen.findByRole('alert');
@@ -150,9 +166,11 @@ describe('事项卡内联编辑', () => {
     vi.mocked(api.addProgress).mockRejectedValueOnce(new Error('进度写入失败'));
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
+    fireEvent.click(screen.getByRole('button', { name: '今日已联系客户' }));
     fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '等待确认' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
     expect((await screen.findByRole('alert')).textContent).toContain('进度写入失败');
+    fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     fireEvent.change(screen.getByLabelText('联系客户的备注'), { target: { value: '普通字段保存成功' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalled());
     expect(screen.getByRole('alert').textContent).toContain('进度写入失败');
@@ -161,7 +179,7 @@ describe('事项卡内联编辑', () => {
 
   it('详情编辑器已打开时将同一事项卡片设为只读', () => {
     render(<ItemList {...props()} editingItemId="one" />);
-    expect(screen.getByLabelText('联系客户的标题').hasAttribute('disabled')).toBe(true);
+    expect(screen.queryByLabelText('联系客户的标题')).toBeNull();
     expect(screen.getByLabelText('联系客户的状态').hasAttribute('disabled')).toBe(true);
     expect(screen.queryByRole('button', { name: '一键完成' })).toBeNull();
     expect(screen.getByLabelText('详情编辑中')).toBeTruthy();
