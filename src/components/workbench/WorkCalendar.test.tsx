@@ -28,6 +28,19 @@ describe('WorkCalendar', () => {
     expect(screen.getByText('第二项')).toBeTruthy();
   });
 
+  it('为四种事项状态渲染对应的日历标记 class', () => {
+    const { container } = render(<WorkCalendar items={[
+      makeItem({ id: 'todo', status: 'todo' }),
+      makeItem({ id: 'doing', status: 'doing' }),
+      makeItem({ id: 'paused', status: 'paused' }),
+      makeItem({ id: 'done', status: 'done' }),
+    ]} onClose={vi.fn()} />);
+    expect(container.querySelector('.work-calendar__status--todo')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__status--doing')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__status--paused')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__status--done')).toBeTruthy();
+  });
+
   it('支持上月、今天、下月和关闭日历', () => {
     const onClose = vi.fn();
     render(<WorkCalendar items={[]} onClose={onClose} />);
