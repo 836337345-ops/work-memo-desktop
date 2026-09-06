@@ -50,4 +50,30 @@ describe('前端 IPC 契约（内存模拟，不访问 SQLite）', () => {
     await expect(api.updateItem('item-autumn-launch', itemInput())).rejects.toThrow('保存失败：测试磁盘不可用');
     await expect(api.restoreBackup('C:/qa-isolated/bad.json')).rejects.toThrow('恢复失败：备份文件校验不通过');
   });
+
+  it('跟进模板 CRUD 固定走独立接口，并按分类隔离、删除分类时级联清理', async () => {
+    const ipc = new WorkMemoIpcDouble();
+    ipc.install();
+    const initial = await api.listFollowUpTemplates();
+    expect(initial.map((template) => template.categoryId)).toEqual(['cat-promotion', 'cat-event']);
+    const created = await api.createFollowUpTemplate({ categoryId: 'cat-promotion', name: '首访流程', items: ['确认需求', '安排首访'] });
+    expect(created.some((template) => template.name === '首访流程' && template.categoryId === 'cat-promotion')).toBe(true);
+    const newTemplate = created.find((template) => template.name === '首访流程');
+    expect(newTemplate).toBeTruthy();
+    await api.updateFollowUpTemplate(newTemplate!.id, { categoryId: 'cat-promotion', name: '首访流程（更新）', items: ['确认需求'] });
+    await api.deleteFollowUpTemplate(newTemplate!.id);
+    await api.deleteCategory('cat-event');
+    expect((await api.listFollowUpTemplates()).every((template) => template.categoryId !== 'cat-event')).toBe(true);
+    expect(ipc.calls.map((call) => call.command)).toEqual([
+      'list_follow_up_templates', 'create_follow_up_template', 'update_follow_up_template', 'delete_follow_up_template', 'delete_category', 'list_follow_up_templates',
+    ]);
+  });
+
+  it('模板非法输入失败且不会写入重复项目', async () => {
+    const ipc = new WorkMemoIpcDouble();
+    ipc.install();
+    await expect(api.createFollowUpTemplate({ categoryId: 'cat-promotion', name: '坏模板', items: ['重复', ' 重复 '] })).rejects.toThrow('重复');
+    await expect(api.createFollowUpTemplate({ categoryId: 'missing', name: '坏模板', items: ['项目'] })).rejects.toThrow('不存在');
+    expect((await api.listFollowUpTemplates()).some((template) => template.name === '坏模板')).toBe(false);
+  });
 });
