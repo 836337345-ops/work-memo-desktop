@@ -1,5 +1,31 @@
 # 公共契约与任务卡
 
+## V2 功能冻结（2026-09-06）
+
+V2 只交付开发/调试版本，用户明确说“确认通过，可以打包”前禁止生成新版安装包。
+
+工作台左侧顺序为“状态、时间、分类”。状态、时间、分类是单维度筛选：任意时刻只生效其中一个具体条件，选择另一个维度时清除前一个维度；关键词搜索始终可以叠加。时间选项为全部时间、今天、本周、下周、本月、下月、历史、逾期；删除未设日期和自定义日期。“历史”是截止日期早于本机今天的所有事项，不限制状态；“逾期”仍只包含截止日期早于今天且状态为 todo/doing 的事项。
+
+事项卡直接展示标题、工作内容（界面称“情况”）、最新进度、跟进清单、备注、状态、分类和截止日期。可在卡片内提交新进度、编辑备注、增删改勾跟进项、修改状态和一键完成；进度必须新增历史记录，跟进勾选不得自动改状态。类别和截止日期只展示，必须点击“修改编辑”进入现有详情编辑器修改。内联写入成功通过 onChanged(WorkItem) 回传根组件，失败通过 onError(string) 展示且保留输入。
+
+现有选择位置导出 JSON 和恢复功能保留。新增 quickBackup，无文件对话框，写入 app data dir 下的“备份”目录。当天首份名称为“工作备份文件YYYYMMDD.json”；同名已存在时增加不会覆盖旧文件的序号后缀。返回 QuickBackupResult（包含 path 与 BackupInfo 字段）。
+
+新增 exportWorkItems(input)，由界面选择 TXT 目标路径。statuses、dateFilters、categoryIds 均支持多选；空数组表示该维度全选，all 与其他时间项同时出现时按全部时间处理，重叠结果去重。categoryIds 的 null 表示未分类。只导出未删除事项。按当前类别顺序分组，未分类最后；组内截止日期正序，无日期最后。每项格式为“序号、YYYY年M月D日，事项标题，事项最新进度；”，组内末项用句号；无日期写“未设日期”，无进度写“暂无最新进度”。文件编码 UTF-8，类别标题使用中文序号。导出默认建议文件名“工作事项汇总YYYYMMDD.txt”。
+
+V2 新接口以 src/types.ts 和 src/api.ts 为准：quickBackup()、exportWorkItems(input)。后端 Rust serde 继续使用 camelCase。
+
+## V2 并行边界
+
+T11 A（feat/quick-backup-export）：只改 src-tauri/src/**、必要的 Cargo 文件与 Rust 测试，实现一键备份及 TXT 导出。
+
+T12 B（feat/inline-item-card）：只改 ItemList.tsx、ItemList 测试、ItemEditor 及 editor.css；实现事项卡展示和内联编辑。不得修改 App、types/api、全局 styles 或 Rust。ItemList 使用基线已提供的 onChanged/onError。
+
+T13 C（feat/workbench-v2）：只改 App.tsx、styles.css、Sidebar、BackupPanel、新增 ExportPanel、filters 及相应测试；实现单维筛选、历史、界面顺序、一键备份入口和导出界面。不得修改 ItemList、ItemEditor、types/api 或 Rust。
+
+T14 QA（qa/v2）：只改 tests/**、测试配置和 docs/QA-V2.md；不得修改业务实现。固定 PM 指定提交后测试。
+
+PM：维护公共契约、处理集成冲突、启动开发版、最终验收；本轮暂不打包。
+
 ## 功能冻结
 Windows 本地单用户工作备忘录。预设类别：推广、包装、活动、拓展、方案、其他，另有虚拟未分类（categoryId=null）。分类可增改排序和删除，删除分类关联事项转未分类。
 截止日期仅 YYYY-MM-DD，以本机日期判断。状态 todo/doing/done/paused；仅 todo 和 doing 可逾期。

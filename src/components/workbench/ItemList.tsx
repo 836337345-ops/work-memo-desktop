@@ -6,6 +6,8 @@ interface ItemListProps {
   categories: Category[];
   selectedId: string | null;
   onSelect: (item: WorkItem) => void;
+  onChanged?: (item: WorkItem) => void;
+  onError?: (message: string) => void;
   onRestore?: (item: WorkItem) => void;
 }
 
