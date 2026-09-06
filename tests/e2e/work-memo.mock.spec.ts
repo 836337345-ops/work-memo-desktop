@@ -28,6 +28,8 @@ const seed: BrowserState = {
     { id: 'item-done-history', title: '已完成活动复盘', content: '整理活动到访数据。', categoryId: 'cat-event', dueDate: '2026-09-01', status: 'done', notes: '归档完成。', followUps: [], progress: [{ id: 'progress-2', content: '复盘已发出。', createdAt: '2026-09-02T09:00:00.000Z' }], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
     { id: 'item-paused-history', title: '暂停包装更新', content: '等待新包装规范。', categoryId: 'cat-package', dueDate: '2026-09-02', status: 'paused', notes: '暂缓执行。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
     { id: 'item-overdue', title: '逾期渠道物料', content: '补齐渠道物料清单。', categoryId: 'cat-promotion', dueDate: '2026-09-04', status: 'todo', notes: '等待供应商报价。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+    { id: 'item-no-date', title: '无截止日期的草稿', content: '不应出现在日历。', categoryId: null, dueDate: null, status: 'todo', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+    { id: 'item-trashed-calendar', title: '已删除的历史事项', content: '不应出现在日历。', categoryId: 'cat-event', dueDate: '2026-09-03', status: 'done', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: '2026-09-04T09:00:00.000Z' },
   ],
   templates: [
     { id: 'template-promotion', categoryId: 'cat-promotion', name: '开放日流程', items: ['确认场地', '邀约客户', '准备物料'], sortOrder: 0, createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z' },
@@ -211,6 +213,21 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(card.getByLabel('跟进内容')).toHaveCount(4);
     await expect(card.getByLabel('跟进内容').first()).toBeEnabled();
     await expect(card.getByText('协调海报、渠道物料与到访动线。', { exact: true }).locator('..').locator('input,textarea')).toHaveCount(0);
+    const hierarchy = await card.evaluate((node) => {
+      const fontSize = (selector: string) => Number.parseFloat(getComputedStyle(node.querySelector(selector) as Element).fontSize);
+      const situationStyle = getComputedStyle(node.querySelector('.item-card__situation') as Element);
+      return {
+        situationBackground: situationStyle.backgroundColor,
+        situationRadius: Number.parseFloat(situationStyle.borderRadius),
+        progress: [fontSize('.item-card__progress b'), fontSize('.item-card__progress-full')],
+        situation: [fontSize('.item-card__situation b'), fontSize('.item-card__situation span')],
+        followUps: [fontSize('section[aria-label="跟进清单"] > b'), fontSize('section[aria-label="跟进清单"] input:not([type="checkbox"])')],
+        notes: [fontSize('.item-card__notes b'), fontSize('.item-card__notes span')],
+      };
+    });
+    expect(hierarchy.situationBackground).not.toBe('rgba(0, 0, 0, 0)');
+    expect(hierarchy.situationRadius).toBeGreaterThan(0);
+    for (const [heading, content] of [hierarchy.progress, hierarchy.situation, hierarchy.followUps, hierarchy.notes]) expect(heading).toBeGreaterThan(content);
     await expect(card.getByLabel('新增进度')).toHaveCount(0);
     await card.getByText('最新进度', { exact: true }).click();
     await card.getByLabel('新增进度').fill('已完成周五现场复核');
@@ -398,5 +415,99 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await page.getByRole('group', { name: '分类' }).getByLabel('未分类').check();
     await page.getByRole('button', { name: '选择位置并导出 TXT' }).click();
     await expect(page.getByRole('status')).toContainText('已导出 2 条事项、2 个分类：C:/qa-isolated/export.json');
+  });
+
+  test('V2.4 工作日历固定六周、周一首日、导航可回到今天且进入时隐藏详情栏', async ({ page }) => {
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const calendar = page.locator('.work-calendar');
+    await expect(calendar).toBeVisible();
+    await expect(page.getByRole('button', { name: '工作日历' })).toHaveClass(/active/);
+    await expect(page.locator('.editor-pane')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: '＋ 新建事项' })).toHaveCount(0);
+    await expect(calendar.getByRole('gridcell')).toHaveCount(42);
+    expect(await calendar.locator('.work-calendar__weekday').allTextContents()).toEqual(['周一', '周二', '周三', '周四', '周五', '周六', '周日']);
+    await expect(calendar.getByRole('heading', { name: '2026年9月' })).toBeVisible();
+    await calendar.getByRole('button', { name: '上月' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年8月' })).toBeVisible();
+    await calendar.getByRole('button', { name: '下月' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年9月' })).toBeVisible();
+    await calendar.getByRole('button', { name: '下月' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年10月' })).toBeVisible();
+    await calendar.getByRole('button', { name: '回到今天' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年9月' })).toBeVisible();
+    await calendar.getByRole('button', { name: '关闭日历' }).click();
+    await expect(page.getByRole('heading', { name: '全部事项' })).toBeVisible();
+  });
+
+  test('V2.4 日历不受列表条件影响，显示四种状态颜色和可聚焦的完整当日标题', async ({ page }) => {
+    await page.getByRole('button', { name: /^时间/ }).click();
+    await page.getByRole('button', { name: /^分类/ }).click();
+    await page.getByRole('button', { name: '已完成', exact: true }).click();
+    await page.getByRole('button', { name: '下周', exact: true }).click();
+    await page.getByRole('button', { name: '包装', exact: true }).click();
+    await page.getByLabel('搜索事项').fill('不存在的关键词');
+    await expect(page.locator('.item-card')).toHaveCount(0);
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const calendar = page.locator('.work-calendar');
+    for (const title of ['样板间开放推广', '已完成活动复盘', '暂停包装更新', '逾期渠道物料']) await expect(calendar.getByText(title, { exact: true })).toBeAttached();
+    await expect(calendar.getByText('无截止日期的草稿', { exact: true })).toHaveCount(0);
+    await expect(calendar.getByText('已删除的历史事项', { exact: true })).toHaveCount(0);
+    const markerColors = await calendar.locator('.work-calendar__status').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node, '::before').backgroundColor));
+    expect(markerColors).toEqual(expect.arrayContaining(['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)', 'rgb(154, 167, 161)']));
+    const day = calendar.getByRole('button', { name: /2026-09-07，1条事项/ });
+    const popover = day.locator('xpath=..').getByRole('tooltip');
+    await day.hover();
+    await expect(popover).toHaveCSS('opacity', '1');
+    await day.focus();
+    await expect(popover).toHaveCSS('opacity', '1');
+    await expect(popover).toContainText('样板间开放推广');
+    await expect(calendar.locator('input, textarea, select')).toHaveCount(0);
+  });
+
+  test('V2.4 1060×700 日历可滚到底部，返回列表、筛选和回收站均正常', async ({ page }) => {
+    await page.setViewportSize({ width: 1060, height: 700 });
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const layout = await page.locator('.work-calendar').evaluate((node) => {
+      const calendar = node as HTMLElement;
+      const pane = document.querySelector('.list-pane') as HTMLElement;
+      calendar.scrollTop = calendar.scrollHeight;
+      return {
+        calendarAtBottom: calendar.scrollTop + calendar.clientHeight >= calendar.scrollHeight,
+        paneScrollable: pane.scrollHeight > pane.clientHeight,
+        documentOverflow: getComputedStyle(document.documentElement).overflowY,
+      };
+    });
+    expect(layout).toEqual({ calendarAtBottom: true, paneScrollable: false, documentOverflow: 'hidden' });
+    await page.getByRole('button', { name: '回收站', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '回收站', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await page.getByRole('button', { name: '显示全部', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '全部事项', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await page.getByRole('button', { name: /^时间/ }).click();
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '历史事项', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await page.getByRole('button', { name: '关闭日历' }).click();
+    await expect(page.getByRole('heading', { name: '历史事项', exact: true })).toBeVisible();
+  });
+
+  test('V2.4 小高度日历只有内部滚动且底部日期可访问', async ({ page }) => {
+    await page.setViewportSize({ width: 1060, height: 360 });
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const layout = await page.locator('.work-calendar').evaluate((node) => {
+      const calendar = node as HTMLElement;
+      const pane = document.querySelector('.list-pane') as HTMLElement;
+      calendar.scrollTop = calendar.scrollHeight;
+      return {
+        calendarOverflow: getComputedStyle(calendar).overflowY,
+        calendarScrollable: calendar.scrollHeight > calendar.clientHeight,
+        calendarAtBottom: calendar.scrollTop + calendar.clientHeight >= calendar.scrollHeight,
+        paneOverflow: getComputedStyle(pane).overflowY,
+        paneScrollable: pane.scrollHeight > pane.clientHeight,
+        documentOverflow: getComputedStyle(document.documentElement).overflowY,
+      };
+    });
+    expect(layout).toEqual({ calendarOverflow: 'auto', calendarScrollable: true, calendarAtBottom: true, paneOverflow: 'hidden', paneScrollable: false, documentOverflow: 'hidden' });
   });
 });
