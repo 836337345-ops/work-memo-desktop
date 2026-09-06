@@ -1,13 +1,11 @@
 import type { ItemStatus, WorkItem } from '../types';
 
-export type DateFilter = 'all' | 'today' | 'thisWeek' | 'nextWeek' | 'thisMonth' | 'nextMonth' | 'overdue' | 'noDate' | 'custom';
+export type DateFilter = 'all' | 'today' | 'thisWeek' | 'nextWeek' | 'thisMonth' | 'nextMonth' | 'history' | 'overdue';
 
 export interface FilterOptions {
   dateFilter: DateFilter;
   categoryId?: string | null;
   status?: ItemStatus | 'all';
-  customStart?: string;
-  customEnd?: string;
   query?: string;
   today?: string;
 }
@@ -30,7 +28,7 @@ function inRange(date: string | null, start: string, end: string) {
   return date !== null && date >= start && date <= end;
 }
 
-export function matchesDateFilter(item: WorkItem, filter: DateFilter, today = formatLocalDate(new Date()), customStart?: string, customEnd?: string) {
+export function matchesDateFilter(item: WorkItem, filter: DateFilter, today = formatLocalDate(new Date())) {
   const dueDate = item.dueDate;
   const weekday = localDate(today).getDay();
   const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
@@ -50,9 +48,8 @@ export function matchesDateFilter(item: WorkItem, filter: DateFilter, today = fo
       const nextMonth = new Date(date.getFullYear(), date.getMonth() + 1, 1);
       return dueDate !== null && dueDate.slice(0, 7) === formatLocalDate(nextMonth).slice(0, 7);
     }
+    case 'history': return dueDate !== null && dueDate < today;
     case 'overdue': return dueDate !== null && dueDate < today && (item.status === 'todo' || item.status === 'doing');
-    case 'noDate': return dueDate === null;
-    case 'custom': return dueDate !== null && (!customStart || dueDate >= customStart) && (!customEnd || dueDate <= customEnd);
   }
 }
 
@@ -81,6 +78,6 @@ export function filterItems(items: WorkItem[], options: FilterOptions) {
   return sortByDueDate(searchItems(items, options.query).filter((item) =>
     (options.categoryId === undefined || item.categoryId === options.categoryId)
     && (!options.status || options.status === 'all' || item.status === options.status)
-    && matchesDateFilter(item, options.dateFilter, options.today, options.customStart, options.customEnd),
+    && matchesDateFilter(item, options.dateFilter, options.today),
   ));
 }
