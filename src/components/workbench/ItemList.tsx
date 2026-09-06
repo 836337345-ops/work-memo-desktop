@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
 import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
+import { formatChineseDate } from '../../lib/dateFormat';
 import { isOverdue } from '../../lib/filters';
 import './item-card.css';
 
@@ -15,7 +16,6 @@ interface ItemListProps {
   editingItemId?: string | null;
 }
 
-const formatDate = (value: string | null) => value ? value.replaceAll('-', '.') : '未设日期';
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
 const newFollowUp = (): FollowUp => ({ id: globalThis.crypto?.randomUUID?.() ?? `follow-${Date.now()}-${Math.random().toString(16).slice(2)}`, text: '', done: false });
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : '保存失败，请重试。';
@@ -31,6 +31,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const [progressText, setProgressText] = useState('');
   const [saving, setSaving] = useState(0);
   const [progressSaving, setProgressSaving] = useState(false);
+  const [progressInputVisible, setProgressInputVisible] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [normalError, setNormalError] = useState<string | null>(null);
   const [progressError, setProgressError] = useState<string | null>(null);
@@ -52,6 +53,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     draftRef.current = next;
     setProgress(item.progress);
     setProgressText('');
+    setProgressInputVisible(false);
     setExpanded(false);
     setNormalError(null);
     setProgressError(null);
@@ -117,7 +119,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
         progressFailedRef.current = false;
         setProgressError(null);
         setProgress(saved.progress);
-        setExpanded(false);
+        setProgressInputVisible(false);
         onChanged?.(saved);
       } catch (reason) {
         if (!progressTextRef.current) {
@@ -148,12 +150,12 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     <article className="item-card" aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}>{expanded ? '⌃' : '⌄'}</button><span className={`status-dot ${draft.status}`} aria-hidden="true" />
-        <div className="item-copy"><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong><small>{categoryName} · {formatDate(item.dueDate)}</small></div>
+        <div className="item-copy"><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong><small>{categoryName} · {formatChineseDate(item.dueDate)}</small></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
         {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
       <div className="item-card__body">
-        <section className="item-card__progress" aria-label="最新进度"><b>最新进度</b><p className="item-card__progress-full">{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && expanded && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
+        <section className="item-card__progress" aria-label="最新进度" onClick={(event) => { if (!readOnly && !(event.target as HTMLElement).closest('textarea,button')) setProgressInputVisible((visible) => !visible); }}><b>最新进度</b><p className="item-card__progress-full">{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && progressInputVisible && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
         {expanded && <><p className="item-card__situation"><b>情况</b><span>{draft.content || '未填写情况'}</span></p><section aria-label="跟进清单"><b>跟进清单</b>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} /><input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul>{!readOnly && <button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button>}</section><div className="item-card__notes"><b>备注</b><span>{draft.notes || '暂无备注'}</span></div></>}
         {saving > 0 && <small>正在保存…</small>}{normalError && <p role="alert">保存失败：{normalError}</p>}{progressError && <p role="alert">进度提交失败：{progressError}</p>}
       </div>

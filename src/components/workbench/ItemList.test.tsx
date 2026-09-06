@@ -21,7 +21,7 @@ describe('V2.2 可折叠事项卡', () => {
     const next = props();
     render(<ItemList {...next} />);
     expect(screen.getByText('联系客户')).toBeTruthy();
-    expect(screen.getByText('推广 · 2000.01.01')).toBeTruthy();
+    expect(screen.getByText('推广 · 2000年1月1日')).toBeTruthy();
     expect(screen.getByText('完整进度文本不可截断')).toBeTruthy();
     expect(screen.getByLabelText('联系客户的状态')).toBeTruthy();
     expect(screen.getByRole('button', { name: '修改编辑' })).toBeTruthy();
@@ -51,22 +51,34 @@ describe('V2.2 可折叠事项卡', () => {
     expect(screen.getByText('详情编辑器更新的进度')).toBeTruthy();
   });
 
-  it('展开态可提交进度并新增历史，成功后自动收起输入框', async () => {
+  it('点击进度标题显示输入，提交成功只隐藏输入并保持卡片展开', async () => {
     vi.mocked(api.addProgress).mockResolvedValue(saved(base, { progress: [{ id: 'p2', content: '刚完成回访', createdAt: '2026-01-02T00:00:00Z' }, ...base.progress] }));
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.click(screen.getByText('最新进度'));
     fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '刚完成回访' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
     await waitFor(() => expect(api.addProgress).toHaveBeenCalledWith('one', '刚完成回访'));
     await waitFor(() => expect(screen.queryByLabelText('新增进度')).toBeNull());
-    expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '收起事项' })).toBeTruthy();
     expect(screen.getByText('刚完成回访')).toBeTruthy();
+  });
+
+  it('收起态点击最新进度正文也能显示输入，成功后保持收起', async () => {
+    vi.mocked(api.addProgress).mockResolvedValue(saved(base, { progress: [{ id: 'p2', content: '收起态新增进度', createdAt: '2026-01-02T00:00:00Z' }, ...base.progress] }));
+    render(<ItemList {...props()} />);
+    fireEvent.click(screen.getByText('完整进度文本不可截断'));
+    fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '收起态新增进度' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
+    await waitFor(() => expect(screen.queryByLabelText('新增进度')).toBeNull());
+    expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
   });
 
   it('进度提交失败保留输入并保持展开', async () => {
     vi.mocked(api.addProgress).mockRejectedValueOnce(new Error('进度暂不可写'));
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.click(screen.getByText('最新进度'));
     const input = screen.getByLabelText('新增进度') as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: '需要保留的进度' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
@@ -90,6 +102,7 @@ describe('V2.2 可折叠事项卡', () => {
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.click(screen.getByText('最新进度'));
     fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '等待确认' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
     expect((await screen.findByRole('alert')).textContent).toContain('进度写入失败');
