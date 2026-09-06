@@ -1,7 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
 import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
-import { isOverdue } from '../../lib/filters';
 
 interface ItemListProps {
   items: WorkItem[];
@@ -30,6 +29,9 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const [progressText, setProgressText] = useState('');
   const [saving, setSaving] = useState(0);
   const [progressSaving, setProgressSaving] = useState(false);
+  const [progressExpanded, setProgressExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [followUpsExpanded, setFollowUpsExpanded] = useState(false);
   const [normalError, setNormalError] = useState<string | null>(null);
   const [progressError, setProgressError] = useState<string | null>(null);
   const draftRef = useRef(draft);
@@ -144,20 +146,15 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     <article className="item-card" aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <span className={`status-dot ${draft.status}`} aria-hidden="true" />
-        <div className="item-copy"><strong>{item.title}</strong><small>{categoryName} · 截止 {formatDate(item.dueDate)}</small></div>
-        {isOverdue(item) && <em className="overdue-label">逾期</em>}
+        <div className="item-copy"><strong>{draft.title}</strong><small>{categoryName} · {formatDate(item.dueDate)}</small></div>
+        <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
         {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
       <div className="item-card__body">
-        <label><b>事项标题</b><input aria-label={`${item.title}的标题`} value={draft.title} disabled={readOnly} onChange={(event) => update('title', event.target.value)} /></label>
-        <label><b>情况</b><textarea aria-label={`${item.title}的情况`} value={draft.content} disabled={readOnly} onChange={(event) => update('content', event.target.value)} placeholder="补充工作内容" rows={3} /></label>
-        <p><b>类别</b>{categoryName}</p>
-        <p><b>截止日期</b>{formatDate(item.dueDate)}</p>
-        <label><b>状态</b><select aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></label>
-        {!readOnly && <button type="button" className="secondary-button" disabled={draft.status === 'done'} onClick={() => update('status', 'done')}>一键完成</button>}
-        <section aria-label="最新进度"><b>最新进度</b><p>{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
-        <section aria-label="跟进清单"><b>跟进清单</b>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} /><input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul>{!readOnly && <button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button>}</section>
-        <label><b>备注</b><textarea aria-label={`${item.title}的备注`} value={draft.notes} disabled={readOnly} onChange={(event) => update('notes', event.target.value)} placeholder="添加备注" rows={2} /></label>
+        <p className="item-card__situation"><b>情况</b><span>{draft.content || '未填写情况'}</span></p>
+        <section className="item-card__progress" aria-label="最新进度"><b>最新进度</b><button type="button" className="item-card__summary" aria-expanded={progressExpanded} onClick={() => setProgressExpanded((open) => !open)}>{progress[0]?.content ?? '暂无最新进度'}</button>{!readOnly && progressExpanded && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
+        <section aria-label="跟进清单"><b>跟进清单</b>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.slice(0, followUpsExpanded ? undefined : 3).map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} /><input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul>{draft.followUps.length > 3 && <button type="button" className="restore-button" onClick={() => setFollowUpsExpanded((open) => !open)}>{followUpsExpanded ? '收起跟进' : `展开全部（${draft.followUps.length}）`}</button>}{!readOnly && <button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button>}</section>
+        <div className="item-card__notes"><b>备注</b><button type="button" className="item-card__summary" aria-expanded={notesExpanded} onClick={() => setNotesExpanded((open) => !open)}>{draft.notes || '暂无备注'}</button>{!readOnly && notesExpanded && <textarea aria-label={`${item.title}的备注`} value={draft.notes} onChange={(event) => update('notes', event.target.value)} placeholder="添加备注" rows={2} />}</div>
         {saving > 0 && <small>正在保存…</small>}{normalError && <p role="alert">保存失败：{normalError}</p>}{progressError && <p role="alert">进度提交失败：{progressError}</p>}
       </div>
     </article>
