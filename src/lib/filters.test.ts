@@ -14,10 +14,10 @@ describe('日期筛选', () => {
     expect(matchesDateFilter(item('2026-09-14'), 'nextWeek', '2026-09-13')).toBe(true);
   });
 
-  it('逾期不包含已完成或暂停事项，且自定义日期包含边界', () => {
+  it('逾期不包含已完成或暂停事项', () => {
     expect(matchesDateFilter(item('2026-09-12'), 'overdue', '2026-09-13')).toBe(true);
     expect(matchesDateFilter(item('2026-09-12', 'done'), 'overdue', '2026-09-13')).toBe(false);
-    expect(matchesDateFilter(item('2026-09-10'), 'custom', '2026-09-13', '2026-09-10', '2026-09-12')).toBe(true);
+    expect(matchesDateFilter(item('2026-09-12', 'paused'), 'overdue', '2026-09-13')).toBe(false);
   });
 
   it('空日期排在最后，同日期按创建时间倒序', () => {
@@ -26,11 +26,12 @@ describe('日期筛选', () => {
     expect(sorted[1].createdAt).toBe('2026-02-01T00:00:00Z');
   });
 
-  it('可组合分类、状态与日期条件', () => {
-    const matched = item('2026-09-13', 'doing'); matched.categoryId = 'promotion';
-    const wrongStatus = item('2026-09-13', 'todo'); wrongStatus.categoryId = 'promotion';
-    const wrongCategory = item('2026-09-13', 'doing'); wrongCategory.categoryId = 'package';
-    expect(filterItems([matched, wrongStatus, wrongCategory], { dateFilter: 'today', categoryId: 'promotion', status: 'doing', today: '2026-09-13' })).toEqual([matched]);
+  it('历史包含所有状态的已过截止日期事项，关键词仍可叠加', () => {
+    const finished = item('2026-09-12', 'done'); finished.title = '已归档方案';
+    const paused = item('2026-09-11', 'paused'); paused.title = '已暂停活动';
+    const today = item('2026-09-13', 'todo'); today.title = '今天事项';
+    expect(filterItems([finished, paused, today], { dateFilter: 'history', query: '方案', today: '2026-09-13' })).toEqual([finished]);
+    expect(matchesDateFilter(paused, 'history', '2026-09-13')).toBe(true);
   });
 
   it('仅待开展和进行中的过期事项显示为逾期', () => {
