@@ -1,274 +1,73 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { api } from '../api';
 import { emptyItem, STATUS_LABELS } from '../types';
-import type { EditorHandle, FollowUp, ItemEditorProps, ItemInput, ItemStatus, WorkItem } from '../types';
+import type { EditorHandle, FollowUp, FollowUpTemplate, ItemEditorProps, ItemInput, ItemStatus, WorkItem } from '../types';
 import './editor.css';
 
-const hasDraftContent = (item: ItemInput) =>
-  Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.dueDate || item.followUps.length);
+const makeId = (prefix: string) => globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
+const hasDraft = (item: ItemInput) => Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.dueDate || item.followUps.length);
 
-const makeFollowUp = (): FollowUp => ({
-  id: globalThis.crypto?.randomUUID?.() ?? `follow-up-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  text: '',
-  done: false,
-});
-
-/** 后端的更新输入严格禁止 WorkItem 的系统字段，不能直接传递列表数据。 */
-const toInput = (item: ItemInput): ItemInput => ({
-  title: item.title,
-  content: item.content,
-  categoryId: item.categoryId,
-  dueDate: item.dueDate,
-  status: item.status,
-  notes: item.notes,
-  followUps: item.followUps.map((followUp) => ({ ...followUp })),
-});
-
-/** 事项编辑器自行串行保存，避免输入很快时较早请求覆盖较晚内容。 */
-const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor(
-  { item, categories, defaultCategoryId = null, onSaved, onDeleted, onCancel },
-  ref,
-) {
+const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor({ item, categories, defaultCategoryId = null, onSaved, onDeleted, onCancel }, ref) {
   const [draft, setDraft] = useState<ItemInput>(() => item ? toInput(item) : emptyItem(defaultCategoryId));
-  const [itemId, setItemId] = useState<string | null>(item?.id ?? null);
-  const [progress, setProgress] = useState(() => item?.progress ?? []);
-  const [progressText, setProgressText] = useState('');
-  const [savingCount, setSavingCount] = useState(0);
-  const [saveFailed, setSaveFailed] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [progressSaving, setProgressSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [itemId, setItemId] = useState<string | null>(item?.id ?? null); const [progress, setProgress] = useState<WorkItem['progress']>(item?.progress ?? []);
+  const [progressText, setProgressText] = useState(''); const [saving, setSaving] = useState(false); const [progressSaving, setProgressSaving] = useState(false); const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<FollowUpTemplate[]>([]); const [templateError, setTemplateError] = useState(''); const [templatesExpanded, setTemplatesExpanded] = useState(false); const [templateEditorOpen, setTemplateEditorOpen] = useState(false); const [editingTemplate, setEditingTemplate] = useState<FollowUpTemplate | null>(null); const [templateName, setTemplateName] = useState(''); const [templateItems, setTemplateItems] = useState<string[]>(['']); const [templateSaving, setTemplateSaving] = useState(false);
+  const draftRef = useRef(draft); const itemIdRef = useRef(itemId); const savedDraftRef = useRef(toInput(draft)); const progressTextRef = useRef(progressText); const onSavedRef = useRef(onSaved);
+  useEffect(() => { onSavedRef.current = onSaved; }, [onSaved]); useEffect(() => { draftRef.current = draft; }, [draft]); useEffect(() => { itemIdRef.current = itemId; }, [itemId]); useEffect(() => { progressTextRef.current = progressText; }, [progressText]);
+  useEffect(() => { const next = item ? toInput(item) : emptyItem(defaultCategoryId); setDraft(next); draftRef.current = next; savedDraftRef.current = next; setItemId(item?.id ?? null); itemIdRef.current = item?.id ?? null; setProgress(item?.progress ?? []); setProgressText(''); setError(null); }, [item?.id]);
+  useEffect(() => { let active = true; const loadTemplates = async () => { if (typeof api.listFollowUpTemplates !== 'function') return; try { const next = await api.listFollowUpTemplates(); if (active) setTemplates(next); } catch { if (active) setTemplateError('模板服务暂不可用'); } }; void loadTemplates(); return () => { active = false; }; }, []);
 
-  const draftRef = useRef(draft);
-  const itemIdRef = useRef(itemId);
-  const writeChainRef = useRef<Promise<boolean>>(Promise.resolve(true));
-  const failedSaveRef = useRef(false);
-  const onSavedRef = useRef(onSaved);
-
-  useEffect(() => { onSavedRef.current = onSaved; }, [onSaved]);
-  useEffect(() => { draftRef.current = draft; }, [draft]);
-  useEffect(() => { itemIdRef.current = itemId; }, [itemId]);
-
-  // 父组件只会更新列表数据；同一事项不能用较旧的 props 覆盖正在编辑的草稿。
-  useEffect(() => {
-    const next = item ? toInput(item) : emptyItem(defaultCategoryId);
-    setDraft(next);
-    draftRef.current = next;
-    setItemId(item?.id ?? null);
-    itemIdRef.current = item?.id ?? null;
-    setProgress(item?.progress ?? []);
-    setProgressText('');
-    setError(null);
-    setSaveFailed(false);
-    failedSaveRef.current = false;
-  }, [item?.id]); // 切换事项才重置，不能依赖 updatedAt
-
-  const enqueueUpdate = useCallback((id: string, input: ItemInput) => {
-    failedSaveRef.current = false;
-    setSaveFailed(false);
-    setError(null);
-    setSavingCount((count) => count + 1);
-    const run = async (): Promise<boolean> => {
-      try {
-        const saved = await api.updateItem(id, input);
-        failedSaveRef.current = false;
-        setSaveFailed(false);
-        setError(null);
-        onSavedRef.current(saved);
-        return true;
-      } catch (reason) {
-        failedSaveRef.current = true;
-        setSaveFailed(true);
-        setError(reason instanceof Error ? reason.message : '保存失败，请重试。');
-        return false;
-      } finally {
-        setSavingCount((count) => Math.max(0, count - 1));
-      }
-    };
-    writeChainRef.current = writeChainRef.current.then(run, run);
-    return writeChainRef.current;
-  }, []);
-
-  const changeDraft = useCallback((next: ItemInput) => {
-    draftRef.current = next;
-    setDraft(next);
-    setError(null);
-    const id = itemIdRef.current;
-    if (id) void enqueueUpdate(id, next);
-  }, [enqueueUpdate]);
-
-  const updateField = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => {
-    changeDraft({ ...draftRef.current, [field]: value });
-  };
-
-  const create = async () => {
-    const input = draftRef.current;
-    if (!input.title.trim()) {
-      setError('请先填写事项标题。');
-      return;
-    }
-    setCreating(true);
-    setError(null);
-    try {
-      const saved = await api.createItem({ ...input, title: input.title.trim() });
-      setItemId(saved.id);
-      itemIdRef.current = saved.id;
-      const createdInput = toInput(saved);
-      setDraft(createdInput);
-      draftRef.current = createdInput;
-      setProgress(saved.progress);
-      failedSaveRef.current = false;
-      onSavedRef.current(saved);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '创建失败，请重试。');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const retry = () => {
-    const id = itemIdRef.current;
-    if (id) void enqueueUpdate(id, draftRef.current);
-    else void create();
-  };
-
-  const submitProgress = async () => {
-    const id = itemIdRef.current;
-    const content = progressText.trim();
-    if (!id) {
-      setError('请先创建事项，再提交进度。');
-      return;
-    }
-    if (!content) return;
-    setProgressSaving(true);
-    setError(null);
-    try {
-      const saved = await api.addProgress(id, content);
-      setProgress(saved.progress);
-      setProgressText('');
-      onSavedRef.current(saved);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '进度提交失败，请重试。');
-    } finally {
-      setProgressSaving(false);
-    }
-  };
-
-  const prepareLeave = useCallback(async (): Promise<boolean> => {
-    const writesOk = await writeChainRef.current;
-    if (!writesOk || failedSaveRef.current) return false;
-    if (!itemIdRef.current && hasDraftContent(draftRef.current)) {
-      return window.confirm('这个新事项尚未创建，确定放弃当前填写内容吗？');
-    }
-    if (progressText.trim()) {
-      return window.confirm('这条进度尚未提交，确定放弃吗？');
-    }
-    return true;
-  }, [progressText]);
-
+  const changeDraft = (next: ItemInput) => { draftRef.current = next; setDraft(next); setError(null); };
+  const updateField = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => changeDraft({ ...draftRef.current, [field]: value });
+  const dirty = () => JSON.stringify(toInput(draftRef.current)) !== JSON.stringify(savedDraftRef.current) || Boolean(progressTextRef.current.trim()) || (!itemIdRef.current && hasDraft(draftRef.current));
+  const prepareLeave = useCallback(async () => { if (!dirty()) return true; return window.confirm('当前编辑尚未保存，确定放弃当前填写内容吗？'); }, []);
   useImperativeHandle(ref, () => ({ prepareLeave }), [prepareLeave]);
 
-  const remove = async () => {
-    const id = itemIdRef.current;
-    if (!id || !window.confirm('删除后事项会移入回收站，确定继续吗？')) return;
-    setError(null);
-    try {
-      await api.trashItem(id);
-      onDeleted(id);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '删除失败，请重试。');
-    }
+  const saveAll = async () => {
+    const input = toInput(draftRef.current); if (!input.title.trim()) { setError('请先填写事项标题。'); return; }
+    setSaving(true); setError(null);
+    try { const saved = itemIdRef.current ? await api.updateItem(itemIdRef.current, { ...input, title: input.title.trim() }) : await api.createItem({ ...input, title: input.title.trim() });
+      setItemId(saved.id); itemIdRef.current = saved.id; const next = toInput(saved); setDraft(next); draftRef.current = next; savedDraftRef.current = next; setProgress(saved.progress); onSavedRef.current(saved); onCancel();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败，请重试。'); } finally { setSaving(false); }
   };
 
-  const cancel = async () => {
-    if (await prepareLeave()) onCancel();
-  };
+  const submitProgress = async () => { const id = itemIdRef.current; const content = progressTextRef.current.trim(); if (!id) { setError('请先保存事项，再提交进度。'); return; } if (!content) return; setProgressSaving(true); setError(null); try { const saved = await api.addProgress(id, content); setProgress(saved.progress); setProgressText(''); progressTextRef.current = ''; onSavedRef.current(saved); } catch (reason) { setError(reason instanceof Error ? reason.message : '进度提交失败，请重试。'); } finally { setProgressSaving(false); } };
+  const remove = async () => { const id = itemIdRef.current; if (!id || !window.confirm('删除后事项会移入回收站，确定继续吗？')) return; try { await api.trashItem(id); onDeleted(id); } catch (reason) { setError(reason instanceof Error ? reason.message : '删除失败，请重试。'); } };
 
-  const deleted = Boolean(item?.deletedAt);
-  const disabled = deleted || creating;
-  const followUps = draft.followUps;
+  const availableTemplates = useMemo(() => draft.categoryId ? templates.filter((template) => template.categoryId === draft.categoryId).sort((a, b) => a.sortOrder - b.sortOrder) : [], [draft.categoryId, templates]);
+  const applyTemplate = (template: FollowUpTemplate) => { const seen = new Set(draftRef.current.followUps.map((entry) => entry.text.trim()).filter(Boolean)); const additions: FollowUp[] = []; for (const rawText of template.items) { const text = rawText.trim(); if (!text || seen.has(text)) continue; seen.add(text); additions.push({ id: makeId('follow-up'), text, done: false }); } if (additions.length) changeDraft({ ...draftRef.current, followUps: [...draftRef.current.followUps, ...additions] }); };
+  const startNewTemplate = () => { setEditingTemplate(null); setTemplateName(''); setTemplateItems(['']); setTemplateError(''); setTemplateEditorOpen(true); };
+  const editTemplate = (template: FollowUpTemplate) => { setEditingTemplate(template); setTemplateName(template.name); setTemplateItems(template.items.length ? [...template.items] : ['']); setTemplateError(''); setTemplateEditorOpen(true); };
+  const saveTemplate = async () => { const categoryId = draftRef.current.categoryId; const name = templateName.trim(); const items = templateItems.map((text) => text.trim()).filter(Boolean); if (!categoryId) return; if (!name || !items.length) { setTemplateError('请填写模板名称和至少一条文字项。'); return; } setTemplateSaving(true); setTemplateError(''); try { const next = editingTemplate ? await api.updateFollowUpTemplate(editingTemplate.id, { categoryId, name, items }) : await api.createFollowUpTemplate({ categoryId, name, items }); setTemplates(next); setTemplateEditorOpen(false); } catch (reason) { setTemplateError(reason instanceof Error ? reason.message : '模板保存失败，请重试。'); } finally { setTemplateSaving(false); } };
+  const deleteTemplate = async (template: FollowUpTemplate) => { if (!window.confirm(`确定删除模板“${template.name}”吗？已写入事项的跟进不会受影响。`)) return; try { setTemplates(await api.deleteFollowUpTemplate(template.id)); } catch (reason) { setTemplateError(reason instanceof Error ? reason.message : '模板删除失败，请重试。'); } };
+  const deleted = Boolean(item?.deletedAt); const disabled = deleted || saving; const followUps = draft.followUps;
 
-  return (
-    <section className="item-editor" aria-label="事项编辑器">
-      <div className="item-editor__heading">
-        <div>
-          <p className="item-editor__eyebrow">{itemId ? '事项详情' : '新建事项'}</p>
-          <h2>{itemId ? '推进下一步' : '记录一件要紧的事'}</h2>
-        </div>
-        {itemId && !deleted && <span className="item-editor__save-state">{savingCount ? '正在保存…' : saveFailed ? '保存失败' : '已自动保存'}</span>}
+  return <section className="item-editor" aria-label="事项编辑器">
+    <div className="item-editor__topbar"><div><p className="item-editor__eyebrow">{itemId ? '事项详情' : '新建事项'}</p><h2>{itemId ? '编辑事项' : '记录一件要紧的事'}</h2></div><button type="button" className="item-editor__primary" disabled={disabled || !draft.title.trim()} onClick={() => void saveAll()}>{saving ? '保存中…' : itemId ? '保存并关闭' : '创建并关闭'}</button></div>
+    <div className="item-editor__scroll">
+      {deleted && <p className="item-editor__readonly">此事项位于回收站，仅供查看。恢复请在回收站中操作。</p>}{error && <div className="item-editor__error" role="alert">{error}</div>}
+      <div className="item-editor__fields"><label className="item-editor__field item-editor__field--title"><span>事项标题 <b aria-hidden="true">*</b></span><input value={draft.title} disabled={disabled} onChange={(event) => updateField('title', event.target.value)} placeholder="例如：确认秋季活动物料" /></label>
+        <label className="item-editor__field"><span>所属类别</span><select value={draft.categoryId ?? ''} disabled={disabled} onChange={(event) => updateField('categoryId', event.target.value || null)}><option value="">未分类</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+        <label className="item-editor__field"><span>当前状态</span><select value={draft.status} disabled={disabled} onChange={(event) => updateField('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></label>
+        <label className="item-editor__field"><span>截止日期</span><input type="date" value={draft.dueDate ?? ''} disabled={disabled} onChange={(event) => updateField('dueDate', event.target.value || null)} /></label>
+        <label className="item-editor__field item-editor__field--wide"><span>事项内容</span><textarea value={draft.content} disabled={disabled} onChange={(event) => updateField('content', event.target.value)} placeholder="补充背景、目标或交付要求" rows={4} /></label>
+        <label className="item-editor__field item-editor__field--wide"><span>备注</span><textarea value={draft.notes} disabled={disabled} onChange={(event) => updateField('notes', event.target.value)} placeholder="记录需要留意的信息" rows={3} /></label>
       </div>
-
-      {deleted && <p className="item-editor__readonly">此事项位于回收站，仅供查看。恢复请在回收站中操作。</p>}
-      {error && <div className="item-editor__error" role="alert">{error}<button type="button" onClick={retry}>重试</button></div>}
-
-      <div className="item-editor__fields">
-        <label className="item-editor__field item-editor__field--title">
-          <span>事项标题 <b aria-hidden="true">*</b></span>
-          <input value={draft.title} disabled={disabled} onChange={(event) => updateField('title', event.target.value)} placeholder="例如：确认秋季活动物料" />
-        </label>
-        <label className="item-editor__field">
-          <span>所属类别</span>
-          <select value={draft.categoryId ?? ''} disabled={disabled} onChange={(event) => updateField('categoryId', event.target.value || null)}>
-            <option value="">未分类</option>
-            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-          </select>
-        </label>
-        <label className="item-editor__field">
-          <span>当前状态</span>
-          <select value={draft.status} disabled={disabled} onChange={(event) => updateField('status', event.target.value as ItemStatus)}>
-            {(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-          </select>
-        </label>
-        <label className="item-editor__field">
-          <span>截止日期</span>
-          <input type="date" value={draft.dueDate ?? ''} disabled={disabled} onChange={(event) => updateField('dueDate', event.target.value || null)} />
-        </label>
-        <label className="item-editor__field item-editor__field--wide">
-          <span>事项内容</span>
-          <textarea value={draft.content} disabled={disabled} onChange={(event) => updateField('content', event.target.value)} placeholder="补充背景、目标或交付要求" rows={4} />
-        </label>
-        <label className="item-editor__field item-editor__field--wide">
-          <span>备注</span>
-          <textarea value={draft.notes} disabled={disabled} onChange={(event) => updateField('notes', event.target.value)} placeholder="记录需要留意的信息" rows={3} />
-        </label>
+      <div className="item-editor__section"><div className="item-editor__section-title"><h3>跟进清单</h3><span>{followUps.filter((entry) => entry.done).length}/{followUps.length}</span></div>
+        {draft.categoryId && <div className="item-editor__template-tools"><button type="button" className="item-editor__text-button" onClick={() => setTemplatesExpanded((open) => !open)}>模板{templatesExpanded ? '收起' : '管理与应用'}</button><button type="button" className="item-editor__text-button" onClick={startNewTemplate}>＋ 新建模板</button></div>}
+        {templatesExpanded && draft.categoryId && <div className="item-editor__templates"><p className="item-editor__template-hint">仅显示当前类别模板，应用后会追加未重复的跟进项。</p>{availableTemplates.map((template) => <div className="item-editor__template-row" key={template.id}><div><strong>{template.name}</strong><small>{template.items.join('、')}</small></div><button type="button" className="item-editor__text-button" onClick={() => applyTemplate(template)}>应用</button><button type="button" className="item-editor__text-button" onClick={() => editTemplate(template)}>编辑</button><button type="button" className="item-editor__icon-button" aria-label={`删除模板：${template.name}`} onClick={() => void deleteTemplate(template)}>×</button></div>)}{!availableTemplates.length && <p className="item-editor__empty">当前类别还没有模板。</p>}</div>}
+        {templateError && !templateEditorOpen && <p className="item-editor__template-error" role="alert">{templateError}</p>}
+        {followUps.length === 0 && <p className="item-editor__empty">把可执行的小步骤放在这里。</p>}<ul className="item-editor__follow-ups">{followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={disabled} onChange={() => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry) })} /><input aria-label="跟进内容" value={followUp.text} disabled={disabled} onChange={(event) => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry) })} placeholder="下一步要做什么？" />{!deleted && <button type="button" className="item-editor__icon-button" aria-label="删除跟进" onClick={() => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.filter((entry) => entry.id !== followUp.id) })}>×</button>}</li>)}</ul>{!deleted && <button type="button" className="item-editor__text-button" onClick={() => changeDraft({ ...draftRef.current, followUps: [...draftRef.current.followUps, { id: makeId('follow-up'), text: '', done: false }] })}>＋ 添加跟进</button>}
       </div>
-
-      <div className="item-editor__section">
-        <div className="item-editor__section-title"><h3>跟进清单</h3><span>{followUps.filter((followUp) => followUp.done).length}/{followUps.length}</span></div>
-        {followUps.length === 0 && <p className="item-editor__empty">把可执行的小步骤放在这里。</p>}
-        <ul className="item-editor__follow-ups">
-          {followUps.map((followUp) => (
-            <li key={followUp.id}>
-              <input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={disabled} onChange={() => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry) })} />
-              <input aria-label="跟进内容" value={followUp.text} disabled={disabled} onChange={(event) => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry) })} placeholder="下一步要做什么？" />
-              {!deleted && <button type="button" className="item-editor__icon-button" aria-label="删除跟进" onClick={() => changeDraft({ ...draftRef.current, followUps: draftRef.current.followUps.filter((entry) => entry.id !== followUp.id) })}>×</button>}
-            </li>
-          ))}
-        </ul>
-        {!deleted && <button type="button" className="item-editor__text-button" onClick={() => changeDraft({ ...draftRef.current, followUps: [...draftRef.current.followUps, makeFollowUp()] })}>＋ 添加跟进</button>}
-      </div>
-
-      <div className="item-editor__section">
-        <div className="item-editor__section-title"><h3>进度记录</h3><span>{progress.length} 条</span></div>
-        {itemId && !deleted && <div className="item-editor__progress-form">
-          <label className="sr-only" htmlFor="progress-content">新的进度</label>
-          <textarea id="progress-content" value={progressText} onChange={(event) => setProgressText(event.target.value)} placeholder="记录刚刚完成的工作或遇到的情况" rows={3} />
-          <button type="button" className="item-editor__primary" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>{progressSaving ? '提交中…' : '提交进度'}</button>
-        </div>}
-        {!itemId && <p className="item-editor__empty">创建事项后即可持续记录推进过程。</p>}
-        {progress.length === 0 && itemId && <p className="item-editor__empty">还没有进度记录。</p>}
-        <ol className="item-editor__progress-list">
-          {progress.map((entry) => <li key={entry.id}><p>{entry.content}</p><time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></li>)}
-        </ol>
-      </div>
-
-      <footer className="item-editor__actions">
-        {!itemId && <button type="button" className="item-editor__primary" disabled={creating || !draft.title.trim()} onClick={() => void create()}>{creating ? '创建中…' : '创建事项'}</button>}
-        <button type="button" className="item-editor__secondary" onClick={() => void cancel()}>关闭</button>
-        {itemId && !deleted && <button type="button" className="item-editor__danger" onClick={() => void remove()}>移入回收站</button>}
-      </footer>
-    </section>
-  );
+      <div className="item-editor__section"><div className="item-editor__section-title"><h3>进度记录</h3><span>{progress.length} 条</span></div>{itemId && !deleted && <div className="item-editor__progress-form"><label className="sr-only" htmlFor="progress-content">新的进度</label><textarea id="progress-content" value={progressText} onChange={(event) => { setProgressText(event.target.value); progressTextRef.current = event.target.value; }} placeholder="记录刚刚完成的工作或遇到的情况" rows={3} /><button type="button" className="item-editor__primary" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>{progressSaving ? '提交中…' : '提交进度'}</button></div>}{!itemId && <p className="item-editor__empty">保存事项后即可持续记录推进过程。</p>}{progress.length === 0 && itemId && <p className="item-editor__empty">还没有进度记录。</p>}<ol className="item-editor__progress-list">{progress.map((entry) => <li key={entry.id}><p>{entry.content}</p><time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString('zh-CN', { hour12: false })}</time></li>)}</ol></div>
+      {itemId && !deleted && <button type="button" className="item-editor__danger item-editor__delete-button" onClick={() => void remove()}>移入回收站</button>}
+    </div>
+    {templateEditorOpen && <TemplateEditor name={templateName} items={templateItems} error={templateError} saving={templateSaving} onName={setTemplateName} onItems={setTemplateItems} onSave={() => void saveTemplate()} onClose={() => setTemplateEditorOpen(false)} />}
+  </section>;
 });
+
+interface TemplateEditorProps { name: string; items: string[]; error: string; saving: boolean; onName: (value: string) => void; onItems: (value: string[]) => void; onSave: () => void; onClose: () => void; }
+function TemplateEditor({ name, items, error, saving, onName, onItems, onSave, onClose }: TemplateEditorProps) { return <div className="item-editor__template-modal" role="dialog" aria-modal="true" aria-labelledby="template-editor-title"><div className="item-editor__template-modal-card"><header><h3 id="template-editor-title">跟进模板</h3><button type="button" className="item-editor__icon-button" aria-label="关闭模板编辑" onClick={onClose}>×</button></header><label className="item-editor__field"><span>模板名称</span><input value={name} onChange={(event) => onName(event.target.value)} placeholder="例如：健康讲座" /></label><div className="item-editor__template-items"><span className="item-editor__template-label">有序文字项</span>{items.map((item, index) => <div key={index}><input aria-label={`模板文字项 ${index + 1}`} value={item} onChange={(event) => onItems(items.map((entry, itemIndex) => itemIndex === index ? event.target.value : entry))} placeholder="例如：确认场地" />{items.length > 1 && <button type="button" className="item-editor__icon-button" aria-label={`删除模板文字项 ${index + 1}`} onClick={() => onItems(items.filter((_, itemIndex) => itemIndex !== index))}>×</button>}</div>)}<button type="button" className="item-editor__text-button" onClick={() => onItems([...items, ''])}>＋ 添加文字项</button></div>{error && <p className="item-editor__template-error" role="alert">{error}</p>}<footer><button type="button" className="item-editor__secondary" onClick={onClose}>取消</button><button type="button" className="item-editor__primary" disabled={saving} onClick={onSave}>{saving ? '保存中…' : '保存模板'}</button></footer></div></div>; }
 
 export default ItemEditor;
