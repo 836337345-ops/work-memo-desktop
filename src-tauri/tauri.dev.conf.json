@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "工作备忘录调试版",
+  "identifier": "com.local.workmemo.dev",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "工作备忘录 · V2 调试版",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 1060,
+        "minHeight": 700
+      }
+    ]
+  }
+}

@@ -16,6 +16,13 @@ npm.cmd run test:e2e
 npm.cmd run tauri build
 ```
 
+当电脑上已有正式版正在运行时，可用独立标识启动 V2 调试版，两者不会共用进程或测试数据：
+
+```powershell
+$env:WORK_MEMO_DATA_DIR = "$PWD\artifacts\v2-user-test-data"
+npm.cmd run tauri -- dev --config src-tauri/tauri.dev.conf.json
+```
+
 浏览器开发入口为 127.0.0.1:1460；真实数据接口依赖桌面运行时，浏览器测试使用隔离模拟接口，不能用作真实数据库验收。
 
 开发约定与分工见 docs/CONTRACT.md，用户操作见 docs/使用说明.md。测试运行使用 WORK_MEMO_DATA_DIR 指定独立临时目录，避免触及日常数据。
