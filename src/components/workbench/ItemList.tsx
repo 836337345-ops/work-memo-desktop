@@ -31,17 +31,22 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const draftRef = useRef(draft);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
   const progressTextRef = useRef(progressText);
+  const ownItemIdRef = useRef(item.id);
+  const ownUpdateAtRef = useRef(item.updatedAt);
 
   useEffect(() => { progressTextRef.current = progressText; }, [progressText]);
-  // 同一事项的父级回传不能覆盖用户仍在输入的本地草稿。
+  // 自身保存的回传不应覆盖仍在输入的草稿；详情编辑器等外部更新则需要刷新卡片。
   useEffect(() => {
+    if (item.id === ownItemIdRef.current && item.updatedAt === ownUpdateAtRef.current) return;
     const next = toInput(item);
     setDraft(next);
     draftRef.current = next;
     setProgress(item.progress);
     setProgressText('');
     setSaveError(null);
-  }, [item.id]);
+    ownItemIdRef.current = item.id;
+    ownUpdateAtRef.current = item.updatedAt;
+  }, [item.id, item.updatedAt]);
 
   const reportFailure = (reason: unknown) => {
     const message = errorText(reason);
@@ -52,11 +57,18 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const enqueueUpdate = (next: ItemInput) => {
     draftRef.current = next;
     setDraft(next);
+    if (!next.title.trim()) {
+      const message = '事项标题不能为空。';
+      setSaveError(message);
+      onError?.(message);
+      return;
+    }
     setSaveError(null);
     setSaving((count) => count + 1);
     const save = async () => {
       try {
         const saved = await api.updateItem(item.id, next);
+        ownUpdateAtRef.current = saved.updatedAt;
         setSaveError(null);
         onChanged?.(saved);
       } catch (reason) {
@@ -80,6 +92,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     setSaveError(null);
     try {
       const saved = await api.addProgress(item.id, content);
+      ownUpdateAtRef.current = saved.updatedAt;
       setProgress(saved.progress);
       onChanged?.(saved);
     } catch (reason) {
@@ -102,7 +115,8 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
         {readOnly ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
       <div className="item-card__body">
-        <p><b>情况</b>{item.content || '未填写情况'}</p>
+        <label><b>事项标题</b><input aria-label={`${item.title}的标题`} value={draft.title} disabled={readOnly} onChange={(event) => update('title', event.target.value)} /></label>
+        <label><b>情况</b><textarea aria-label={`${item.title}的情况`} value={draft.content} disabled={readOnly} onChange={(event) => update('content', event.target.value)} placeholder="补充工作内容" rows={3} /></label>
         <p><b>类别</b>{categoryName}</p>
         <p><b>截止日期</b>{formatDate(item.dueDate)}</p>
         <label><b>状态</b><select aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></label>
