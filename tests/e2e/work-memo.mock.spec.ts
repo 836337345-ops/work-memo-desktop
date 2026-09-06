@@ -187,7 +187,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(overdue.getByText('逾期', { exact: true })).toBeVisible();
   });
 
-  test('事项卡默认收起，完整显示最新进度；展开后仅编辑状态、进度和跟进', async ({ page }) => {
+  test('事项卡默认收起，点击最新进度标题才出现输入；提交成功保持当前展开状态', async ({ page }) => {
     const card = page.getByRole('article', { name: '事项：样板间开放推广' });
     await expect(card.getByRole('button', { name: '展开事项' })).toBeVisible();
     await expect(card.locator('.item-card__progress-full')).toContainText('已收集三家渠道的物料清单。');
@@ -211,21 +211,30 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(card.getByLabel('跟进内容')).toHaveCount(4);
     await expect(card.getByLabel('跟进内容').first()).toBeEnabled();
     await expect(card.getByText('协调海报、渠道物料与到访动线。', { exact: true }).locator('..').locator('input,textarea')).toHaveCount(0);
+    await expect(card.getByLabel('新增进度')).toHaveCount(0);
+    await card.getByText('最新进度', { exact: true }).click();
     await card.getByLabel('新增进度').fill('已完成周五现场复核');
     await card.getByRole('button', { name: '提交新进度' }).click();
-    await expect(card.getByRole('button', { name: '展开事项' })).toBeVisible();
+    await expect(card.getByRole('button', { name: '收起事项' })).toBeVisible();
+    await expect(card.getByLabel('新增进度')).toHaveCount(0);
   });
 
-  test('三栏在小窗口各自可滚动到底部，状态灯颜色正确且减少动画时停止动画', async ({ page }) => {
+  test('小窗口左栏和列表可滚动到底部，详情栏由内部单滚动区访问底部内容', async ({ page }) => {
     await page.setViewportSize({ width: 1060, height: 360 });
     await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
-    const panes = await page.evaluate(() => ['.sidebar', '.item-list', '.editor-pane'].map((selector) => {
+    const panes = await page.evaluate(() => ['.sidebar', '.item-list'].map((selector) => {
       const node = document.querySelector(selector) as HTMLElement;
       const style = getComputedStyle(node);
       node.scrollTop = node.scrollHeight;
       return { selector, overflowY: style.overflowY, scrollable: node.scrollHeight > node.clientHeight, atBottom: node.scrollTop + node.clientHeight >= node.scrollHeight };
     }));
     expect(panes.every((pane) => ['auto', 'scroll'].includes(pane.overflowY) && pane.scrollable && pane.atBottom)).toBe(true);
+    const editorBottom = await page.locator('.item-editor__scroll').evaluate((node) => {
+      const scroll = node as HTMLElement;
+      scroll.scrollTop = scroll.scrollHeight;
+      return scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight;
+    });
+    expect(editorBottom).toBe(true);
     const expected = ['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)', 'rgb(154, 167, 161)'];
     const colors = await page.locator('.item-card .status-dot').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
     for (const color of expected) expect(colors).toContain(color);
@@ -239,12 +248,80 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await page.reload();
     const card = page.getByRole('article', { name: '事项：样板间开放推广' });
     await card.getByRole('button', { name: '展开事项' }).click();
+    await card.getByText('最新进度', { exact: true }).click();
     const progress = card.getByLabel('新增进度');
     await progress.fill('不得丢失的进度');
     await card.getByRole('button', { name: '提交新进度' }).click();
     await expect(progress).toHaveValue('不得丢失的进度');
     await expect(page.getByText('进度提交失败：保存失败：测试磁盘不可用', { exact: true })).toBeVisible();
     await expect(card.getByRole('button', { name: '收起事项' })).toBeVisible();
+  });
+
+  test('V2.3 详情栏仅有约定字段、顶部保存区固定且底部内容可访问', async ({ page }) => {
+    await page.setViewportSize({ width: 1060, height: 360 });
+    await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    const topbar = editor.locator('.item-editor__topbar');
+    const scroll = editor.locator('.item-editor__scroll');
+    await expect(editor.getByLabel(/事项标题/)).toBeVisible();
+    await expect(editor.getByLabel('所属类别')).toBeVisible();
+    await expect(editor.getByLabel('截止日期')).toBeVisible();
+    await expect(editor.getByLabel('事项情况')).toBeVisible();
+    await expect(editor.getByLabel('备注')).toBeVisible();
+    await expect(editor.getByLabel('跟进内容').first()).toBeVisible();
+    await expect(editor.getByLabel('当前状态')).toHaveCount(0);
+    await expect(editor.getByLabel('新增进度')).toHaveCount(0);
+    await expect(editor.getByText('进度记录', { exact: true })).toHaveCount(0);
+
+    const beforeTop = await topbar.evaluate((node) => node.getBoundingClientRect().top);
+    const layout = await editor.evaluate((node) => {
+      const scrollNode = node.querySelector('.item-editor__scroll') as HTMLElement;
+      const style = getComputedStyle(node);
+      const scrollStyle = getComputedStyle(scrollNode);
+      scrollNode.scrollTop = scrollNode.scrollHeight;
+      return {
+        outerOverflow: style.overflowY,
+        innerOverflow: scrollStyle.overflowY,
+        innerScrollable: scrollNode.scrollHeight > scrollNode.clientHeight,
+        reachedBottom: scrollNode.scrollTop + scrollNode.clientHeight >= scrollNode.scrollHeight,
+      };
+    });
+    expect(layout).toEqual({ outerOverflow: 'hidden', innerOverflow: 'auto', innerScrollable: true, reachedBottom: true });
+    const editorPaneLayout = await page.locator('.editor-pane').evaluate((node) => {
+      const pane = node as HTMLElement;
+      const style = getComputedStyle(pane);
+      return { overflowY: style.overflowY, scrollable: pane.scrollHeight > pane.clientHeight };
+    });
+    expect(editorPaneLayout).toEqual({ overflowY: 'hidden', scrollable: false });
+    expect(await topbar.evaluate((node) => node.getBoundingClientRect().top)).toBe(beforeTop);
+    await expect(topbar.getByRole('button', { name: '保存并关闭' })).toBeVisible();
+    await editor.getByRole('button', { name: '移入回收站' }).scrollIntoViewIfNeeded();
+    await expect(editor.getByRole('button', { name: '移入回收站' })).toBeVisible();
+  });
+
+  test('V2.3 显示全部会清除组合条件、搜索并退出回收站', async ({ page }) => {
+    await page.getByRole('button', { name: /^时间/ }).click();
+    await page.getByRole('button', { name: /^分类/ }).click();
+    await page.getByRole('button', { name: '进行中', exact: true }).click();
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await page.getByRole('button', { name: '包装', exact: true }).click();
+    const search = page.getByLabel('搜索事项');
+    await search.fill('暂停');
+    await page.getByRole('button', { name: '回收站', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '回收站', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '显示全部', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '全部事项', exact: true })).toBeVisible();
+    await expect(search).toHaveValue('');
+    await expect(page.getByRole('article', { name: '事项：样板间开放推广' })).toBeVisible();
+    await expect(page.locator('.sidebar .nav-link.active').allTextContents()).resolves.toEqual(expect.arrayContaining(['全部状态', '全部时间', '全部分类']));
+  });
+
+  test('V2.3 日期和备份时间统一显示中文格式', async ({ page }) => {
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await expect(card.locator('small')).toContainText('推广 · 2026年9月7日');
+    await page.getByRole('button', { name: '备份与恢复' }).click();
+    await page.getByRole('button', { name: '一键备份到本地' }).click();
+    await expect(page.getByRole('status')).toContainText(/导出于 2026年9月6日 \d{2}:\d{2}/);
   });
 
   test('编辑器默认隐藏，仅新建或修改编辑打开；普通字段不自动写入且保存失败保留输入', async ({ page }) => {
