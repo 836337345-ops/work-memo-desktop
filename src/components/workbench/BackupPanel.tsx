@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { confirm, open, save } from '@tauri-apps/plugin-dialog';
 import { api } from '../../api';
 import type { BackupInfo } from '../../types';
+import { formatChineseDateTime } from '../../lib/dateFormat';
 
 interface BackupPanelProps { onRestored: () => Promise<void>; onClose: () => void; }
 const fileFilter = [{ name: '备份文件', extensions: ['json'] }];
@@ -9,7 +10,7 @@ const fileFilter = [{ name: '备份文件', extensions: ['json'] }];
 export function BackupPanel({ onRestored, onClose }: BackupPanelProps) {
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [checking, setChecking] = useState(false); const [backingUp, setBackingUp] = useState(false);
   const chooseSingleFile = async () => { const result = await open({ multiple: false, directory: false, filters: fileFilter }); return typeof result === 'string' ? result : null; };
-  const describe = (info: BackupInfo) => `版本 ${info.schemaVersion}，含 ${info.categoryCount} 个分类和 ${info.itemCount} 条事项，导出于 ${new Date(info.exportedAt).toLocaleString('zh-CN')}`;
+  const describe = (info: BackupInfo) => `版本 ${info.schemaVersion}，含 ${info.categoryCount} 个分类和 ${info.itemCount} 条事项，导出于 ${formatChineseDateTime(info.exportedAt)}`;
   const exportFile = async () => { try { setError(''); const path = await save({ defaultPath: '工作备忘录备份.json', filters: fileFilter }); if (!path) return; const info = await api.exportBackup(path); setNotice(`备份已导出：${path}（${describe(info)}）`); } catch (reason) { setError(String(reason)); } };
   const quickBackup = async () => { try { setError(''); setNotice(''); setBackingUp(true); const result = await api.quickBackup(); setNotice(`已创建本地备份：${result.path}（${describe(result)}）`); } catch (reason) { setError(String(reason)); } finally { setBackingUp(false); } };
   const restoreFile = async () => { try { setError(''); setNotice(''); const path = await chooseSingleFile(); if (!path) return; setChecking(true); const info = await api.inspectBackup(path); setChecking(false); const accepted = await confirm(`已校验备份：${describe(info)}。恢复会替换当前所有本地数据；系统会先创建当前数据的安全备份。是否继续？`, { title: '恢复备份', kind: 'warning', okLabel: '确认恢复', cancelLabel: '取消' }); if (!accepted) return; const result = await api.restoreBackup(path); await onRestored(); setNotice(`恢复完成，共恢复 ${result.itemCount} 条事项。恢复前的数据已安全备份至：${result.safetyBackupPath}`); } catch (reason) { setChecking(false); setError(String(reason)); } };

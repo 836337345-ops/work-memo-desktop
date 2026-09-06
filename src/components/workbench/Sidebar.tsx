@@ -17,6 +17,7 @@ interface SidebarProps {
   onCategory: (categoryId: string | null | undefined) => void;
   onStatus: (status: ItemStatus | 'all') => void;
   onTrash: () => void;
+  onShowAll: () => void;
   onManageCategories: () => void;
   onOpenBackup: () => void;
   onOpenExport: () => void;
@@ -42,13 +43,14 @@ function readExpanded(): ExpandedState {
   } catch { return defaultExpanded; }
 }
 
-export function Sidebar({ categories, filters, trash, onDateFilter, onCategory, onStatus, onTrash, onManageCategories, onOpenBackup, onOpenExport }: SidebarProps) {
+export function Sidebar({ categories, filters, trash, onDateFilter, onCategory, onStatus, onTrash, onShowAll, onManageCategories, onOpenBackup, onOpenExport }: SidebarProps) {
   const [expanded, setExpanded] = useState<ExpandedState>(readExpanded);
   const toggle = (group: Group) => setExpanded((current) => { const next = { ...current, [group]: !current[group] }; try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* 本机存储不可用时不影响导航 */ } return next; });
   const categoryLabel = filters.categoryId === undefined ? '全部分类' : filters.categoryId === null ? '未分类' : categories.find((category) => category.id === filters.categoryId)?.name ?? '未分类';
   const summary = { status: filters.status === 'all' ? '全部' : STATUS_LABELS[filters.status], time: dateLinks.find((link) => link.value === filters.date)?.label ?? '全部时间', category: categoryLabel };
   return <aside className="sidebar" aria-label="事项导航">
     <div className="brand"><span className="brand-mark">✓</span><span>工作备忘录</span></div>
+    <button className="sidebar-show-all" onClick={onShowAll}>显示全部</button>
     <nav>
       <section className={`sidebar-group sidebar-group-${expanded.status ? 'open' : 'closed'}`}>
         <button className="sidebar-group-title" aria-expanded={expanded.status} aria-controls="status-filter-group" onClick={() => toggle('status')}><span>状态</span>{!expanded.status && <small>{summary.status}</small>}<span className="group-chevron" aria-hidden="true">{expanded.status ? '⌃' : '⌄'}</span></button>
