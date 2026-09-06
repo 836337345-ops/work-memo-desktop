@@ -1,5 +1,5 @@
 import { mockIPC } from '@tauri-apps/api/mocks';
-import type { Category, ItemInput, WorkItem } from '../../src/types';
+import type { Category, ItemInput, WorkItem, WorkItemsExportInput } from '../../src/types';
 import { QA_NOW, launchItem, qaCategories } from './fixtures';
 
 export type IpcCall = { command: string; payload: Record<string, unknown> | undefined };
@@ -74,6 +74,11 @@ export class WorkMemoIpcDouble {
         return this.categories.map((value) => ({ ...value }));
       }
       case 'export_backup': return { schemaVersion: 1, exportedAt: QA_NOW, itemCount: this.items.length, categoryCount: this.categories.length };
+      case 'quick_backup': return { path: 'C:/qa-isolated/备份/工作备份文件20260906.json', schemaVersion: 1, exportedAt: QA_NOW, itemCount: this.items.length, categoryCount: this.categories.length };
+      case 'export_work_items': {
+        const input = payload?.input as WorkItemsExportInput;
+        return { path: input.path, itemCount: this.items.filter((item) => item.deletedAt === null).length, categoryCount: this.categories.length };
+      }
       case 'inspect_backup': return { schemaVersion: 1, exportedAt: QA_NOW, itemCount: 1, categoryCount: 3 };
       case 'restore_backup': return { safetyBackupPath: 'C:/qa-isolated/backup-before-restore.json', itemCount: 1 };
       case 'app_info': return { dataDir: 'C:/qa-isolated', version: '0.1.0-test' };

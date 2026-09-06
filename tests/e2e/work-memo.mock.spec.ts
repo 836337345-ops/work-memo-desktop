@@ -17,13 +17,12 @@ const seed: BrowserState = {
     { id: 'cat-event', name: '活动', sortOrder: 1 },
     { id: 'cat-package', name: '包装', sortOrder: 2 },
   ],
-  items: [{
-    id: 'item-autumn-launch', title: '秋季新盘样板间开放推广', content: '协调海报、渠道物料与到访动线。',
-    categoryId: 'cat-promotion', dueDate: '2026-09-07', status: 'doing', notes: '虚构测试事项。',
-    followUps: [{ id: 'follow-1', text: '确认渠道海报尺寸', done: false }],
-    progress: [{ id: 'progress-1', content: '已收集三家渠道的物料清单。', createdAt: '2026-09-06T09:00:00.000Z' }],
-    createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z', deletedAt: null,
-  }],
+  items: [
+    { id: 'item-current', title: '样板间开放推广', content: '协调海报、渠道物料与到访动线。', categoryId: 'cat-promotion', dueDate: '2026-09-07', status: 'doing', notes: '优先核对到访动线。', followUps: [{ id: 'follow-1', text: '确认渠道海报尺寸', done: false }], progress: [{ id: 'progress-1', content: '已收集三家渠道的物料清单。', createdAt: '2026-09-06T09:00:00.000Z' }], createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z', deletedAt: null },
+    { id: 'item-done-history', title: '已完成活动复盘', content: '整理活动到访数据。', categoryId: 'cat-event', dueDate: '2026-09-01', status: 'done', notes: '归档完成。', followUps: [], progress: [{ id: 'progress-2', content: '复盘已发出。', createdAt: '2026-09-02T09:00:00.000Z' }], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
+    { id: 'item-paused-history', title: '暂停包装更新', content: '等待新包装规范。', categoryId: 'cat-package', dueDate: '2026-09-02', status: 'paused', notes: '暂缓执行。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
+    { id: 'item-overdue', title: '逾期渠道物料', content: '补齐渠道物料清单。', categoryId: 'cat-promotion', dueDate: '2026-09-04', status: 'todo', notes: '等待供应商报价。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+  ],
 };
 
 async function mockIpc(page: Page, state: BrowserState = seed) {
@@ -101,6 +100,8 @@ async function mockIpc(page: Page, state: BrowserState = seed) {
         }
         case 'reorder_categories': state.categories = payload.ids.map((id: string, index: number) => ({ ...category(id), sortOrder: index })); return structuredClone(state.categories);
         case 'export_backup': return { schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length };
+        case 'quick_backup': return { path: 'C:/qa-isolated/备份/工作备份文件20260906.json', schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length };
+        case 'export_work_items': return { path: payload.input.path, itemCount: 2, categoryCount: 2 };
         case 'inspect_backup': return { schemaVersion: 1, exportedAt: now, itemCount: 1, categoryCount: 3 };
         case 'restore_backup': return { safetyBackupPath: 'C:/qa-isolated/backup-before-restore.json', itemCount: 1 };
         case 'app_info': return { dataDir: 'C:/qa-isolated', version: '0.1.0-test' };
@@ -110,7 +111,7 @@ async function mockIpc(page: Page, state: BrowserState = seed) {
   }, state);
 }
 
-test.describe('工作备忘录 UI / IPC 模拟验收', () => {
+test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
   test.skip(!uiReady, '仅在明确设置 QA_UI_READY=1 时执行 UI / IPC 模拟验收。');
 
   test.beforeEach(async ({ page }) => {
@@ -118,70 +119,74 @@ test.describe('工作备忘录 UI / IPC 模拟验收', () => {
     await page.goto('/');
   });
 
-  test('创建事项后编辑会自动保存，进度另行提交且历史保留', async ({ page }) => {
-    await page.getByRole('button', { name: '新建事项' }).click();
-    await page.getByLabel('事项标题').fill('国庆案场暖场推广');
-    await page.getByLabel('事项内容').fill('准备沙盘贴与签到背景板。');
-    await page.getByLabel('截止日期').fill('2026-10-01');
-    await page.getByRole('button', { name: '创建事项' }).click();
-    await expect(page.getByText('国庆案场暖场推广')).toBeVisible();
-    await page.getByLabel('事项标题').fill('国庆案场暖场推广（已确认）');
-    await expect(page.getByText('已自动保存')).toBeVisible();
-    await page.getByLabel('新的进度').fill('签到背景板已送印。');
-    await page.getByRole('button', { name: '提交进度' }).click();
-    await expect(page.getByText('签到背景板已送印。', { exact: true })).toBeVisible();
-  });
+  test('左栏依状态、时间、分类排序，筛选只保留一个维度且搜索可叠加', async ({ page }) => {
+    const buttons = await page.getByRole('button').allTextContents();
+    expect(buttons.indexOf('待开展')).toBeLessThan(buttons.indexOf('全部时间'));
+    expect(buttons.indexOf('全部时间')).toBeLessThan(buttons.indexOf('全部分类'));
 
-  test('组合筛选支持分类、状态、关键词与下周/下月日期范围', async ({ page }) => {
-    await page.getByRole('button', { name: '推广', exact: true }).click();
     await page.getByRole('button', { name: '进行中', exact: true }).click();
-    await page.getByLabel('搜索事项').fill('样板间');
-    await page.getByRole('button', { name: '下周', exact: true }).click();
-    await expect(page.getByText('秋季新盘样板间开放推广')).toBeVisible();
-    await page.getByRole('button', { name: '下月', exact: true }).click();
-    await expect(page.getByText('秋季新盘样板间开放推广')).not.toBeVisible();
+    await expect(page.getByText('样板间开放推广', { exact: true })).toBeVisible();
+    await expect(page.getByText('已完成活动复盘', { exact: true })).not.toBeVisible();
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await expect(page.getByText('已完成活动复盘', { exact: true })).toBeVisible();
+    await expect(page.getByText('暂停包装更新', { exact: true })).toBeVisible();
+    await expect(page.getByText('样板间开放推广', { exact: true })).not.toBeVisible();
+    await page.getByRole('button', { name: '推广', exact: true }).click();
+    await page.getByLabel('搜索事项').fill('渠道');
+    await expect(page.getByText('逾期渠道物料', { exact: true })).toBeVisible();
+    await expect(page.getByText('已完成活动复盘', { exact: true })).not.toBeVisible();
   });
 
-  test('分类可新建、改名、重排、删除；删除后事项回到未分类', async ({ page }) => {
-    await page.getByRole('button', { name: '管理分类' }).click();
-    await page.getByLabel('新分类名称').fill('拓展');
-    await page.getByRole('button', { name: '添加' }).click();
-    const activity = page.locator('.category-list li').filter({ hasText: '活动' });
-    await activity.getByRole('button', { name: '改名' }).click();
-    await page.getByLabel('分类名称', { exact: true }).fill('活动执行');
-    await page.getByRole('button', { name: '保存', exact: true }).click();
-    const expansion = page.locator('.category-list li').filter({ hasText: '拓展' });
-    await expansion.getByRole('button', { name: '上移 拓展' }).click();
-    const promotion = page.locator('.category-list li').filter({ hasText: '推广' });
-    await promotion.getByRole('button', { name: '删除' }).click();
-    await expect(page.getByText('未分类 · 进行中')).toBeVisible();
+  test('历史包含所有状态，逾期只显示待开展或进行中事项', async ({ page }) => {
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await expect(page.getByText('已完成活动复盘', { exact: true })).toBeVisible();
+    await expect(page.getByText('暂停包装更新', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '已逾期', exact: true }).click();
+    await expect(page.getByText('逾期渠道物料', { exact: true })).toBeVisible();
+    await expect(page.getByText('已完成活动复盘', { exact: true })).not.toBeVisible();
+    await expect(page.getByText('暂停包装更新', { exact: true })).not.toBeVisible();
   });
 
-  test('删除进入回收站并可恢复，跟进勾选不改变事项状态', async ({ page }) => {
-    await page.getByText('秋季新盘样板间开放推广').click();
-    await page.getByLabel('完成：确认渠道海报尺寸').check();
-    await expect(page.getByLabel('当前状态')).toHaveValue('doing');
-    await page.getByRole('button', { name: '移入回收站' }).click();
-    await page.getByRole('button', { name: '回收站' }).click();
-    await page.getByRole('button', { name: '还原' }).click();
-    await page.getByRole('button', { name: '全部事项' }).click();
-    await expect(page.getByText('秋季新盘样板间开放推广')).toBeVisible();
+  test('事项卡可内联更新情况、进度、备注、跟进和状态，并保留类别日期的详情编辑入口', async ({ page }) => {
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await expect(card.getByText('协调海报、渠道物料与到访动线。')).toBeVisible();
+    await expect(card.getByText('已收集三家渠道的物料清单。')).toBeVisible();
+    await card.getByLabel('样板间开放推广的情况').fill('确认沙盘贴与签到背景板。');
+    await card.getByLabel('样板间开放推广的备注').fill('下午确认到访动线。');
+    await card.getByLabel('完成：确认渠道海报尺寸').check();
+    await card.getByLabel('新增进度').fill('签到背景板已送印。');
+    await card.getByRole('button', { name: '提交新进度' }).click();
+    await expect(card.getByText('签到背景板已送印。', { exact: true })).toBeVisible();
+    await card.getByLabel('样板间开放推广的状态').selectOption('todo');
+    await card.getByRole('button', { name: '一键完成' }).click();
+    await expect(card.getByLabel('样板间开放推广的状态')).toHaveValue('done');
+    await expect(card.locator('p').filter({ hasText: '类别推广' })).toBeVisible();
+    await expect(card.locator('p').filter({ hasText: '截止日期2026.09.07' })).toBeVisible();
+    await card.getByRole('button', { name: '修改编辑' }).click();
+    await expect(page.getByLabel('所属类别')).toBeVisible();
+    await expect(page.getByLabel('截止日期')).toBeVisible();
   });
 
-  test('备份导出、检查和恢复均经由对话框 IPC，并显示安全备份位置', async ({ page }) => {
-    await page.getByRole('button', { name: '备份与恢复' }).click();
-    await page.getByRole('button', { name: '选择位置并导出备份' }).click();
-    await expect(page.getByText(/备份已导出/)).toBeVisible();
-    await page.getByRole('button', { name: '选择备份并恢复' }).click();
-    await expect(page.getByText(/恢复前的数据已安全备份至/)).toBeVisible();
-  });
-
-  test('保存故障显示错误且不误报已保存', async ({ page }) => {
+  test('内联快速保存失败时提示中文错误并保留输入', async ({ page }) => {
     await mockIpc(page, { ...seed, failures: { update_item: '保存失败：测试磁盘不可用' } });
     await page.reload();
-    await page.getByText('秋季新盘样板间开放推广').click();
-    await page.getByLabel('事项标题').fill('不应伪成功的保存');
-    await expect(page.getByText('保存失败：测试磁盘不可用')).toBeVisible();
-    await expect(page.getByText('已自动保存')).not.toBeVisible();
+    const notes = page.getByLabel('样板间开放推广的备注');
+    await notes.fill('不得丢失的备注');
+    await expect(notes).toHaveValue('不得丢失的备注');
+    await expect(page.getByText('保存失败：测试磁盘不可用', { exact: true })).toBeVisible();
+  });
+
+  test('一键备份显示本地路径，并可三维多选导出 TXT 成功反馈', async ({ page }) => {
+    await page.getByRole('button', { name: '备份与恢复' }).click();
+    await page.getByRole('button', { name: '一键备份到本地' }).click();
+    await expect(page.getByRole('status')).toContainText('C:/qa-isolated/备份/工作备份文件20260906.json');
+    await page.getByRole('button', { name: '关闭' }).click();
+    await page.getByRole('button', { name: '导出事项' }).click();
+    await page.getByRole('group', { name: '状态' }).getByLabel('进行中').check();
+    await page.getByRole('group', { name: '时间' }).getByLabel('下周').check();
+    await page.getByRole('group', { name: '分类' }).getByLabel('推广').check();
+    await page.getByRole('group', { name: '分类' }).getByLabel('未分类').check();
+    await page.getByRole('button', { name: '选择位置并导出 TXT' }).click();
+    await expect(page.getByRole('status')).toContainText('已导出 2 条事项、2 个分类：C:/qa-isolated/export.json');
   });
 });

@@ -19,7 +19,7 @@ describe('前端 IPC 契约（内存模拟，不访问 SQLite）', () => {
     expect(ipc.calls.map((call) => call.command)).toEqual(['create_item', 'update_item', 'add_progress']);
   });
 
-  it('分类管理、回收站和备份接口携带约定的参数', async () => {
+  it('分类管理、回收站、备份与 V2 文本导出接口携带约定的参数', async () => {
     const ipc = new WorkMemoIpcDouble();
     ipc.install();
     await api.createCategory('拓展');
@@ -29,13 +29,17 @@ describe('前端 IPC 契约（内存模拟，不访问 SQLite）', () => {
     await api.trashItem('item-autumn-launch');
     await api.restoreItem('item-autumn-launch');
     await api.exportBackup('C:/qa-isolated/export.json');
+    const quick = await api.quickBackup();
+    const exported = await api.exportWorkItems({ path: 'C:/qa-isolated/事项.txt', statuses: ['doing'], dateFilters: ['nextWeek'], categoryIds: ['cat-promotion', null] });
     await api.inspectBackup('C:/qa-isolated/export.json');
     await api.restoreBackup('C:/qa-isolated/export.json');
 
     expect(ipc.calls.map((call) => call.command)).toEqual([
       'create_category', 'rename_category', 'reorder_categories', 'delete_category',
-      'trash_item', 'restore_item', 'export_backup', 'inspect_backup', 'restore_backup',
+      'trash_item', 'restore_item', 'export_backup', 'quick_backup', 'export_work_items', 'inspect_backup', 'restore_backup',
     ]);
+    expect(quick.path).toContain('工作备份文件20260906.json');
+    expect(exported).toMatchObject({ path: 'C:/qa-isolated/事项.txt', itemCount: 1 });
     expect(ipc.items[0]?.deletedAt).toBeNull();
     expect(ipc.items[0]?.categoryId).toBe('cat-promotion');
   });
