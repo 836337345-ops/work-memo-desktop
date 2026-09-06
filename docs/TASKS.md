@@ -30,8 +30,8 @@ V2 开发完成后只启动开发/调试版本供用户测试；用户明确说�
 
 | 卡号 | 任务 | 分支 | 状态 |
 | --- | --- | --- | --- |
-| T21 | 开发员 A｜窗口底部与三栏滚动 | feat/window-scroll-fix | 待分发 |
-| T22 | 开发员 B｜紧凑事项卡与状态灯 | feat/compact-item-card | 待分发 |
-| T23 | 开发员 C｜多维筛选与折叠导航 | feat/multidim-sidebar | 待分发 |
-| T24 | 独立测试员｜V2.1 界面验收 | qa/v2.1 | 待分发 |
-| T25 | PM｜集成并启动隔离调试版 | integration/v2 | 待开始 |
+| T21 | 开发员 A｜窗口底部与三栏滚动 | feat/window-scroll-fix | 已完成（5fa0413） |
+| T22 | 开发员 B｜紧凑事项卡与状态灯 | feat/compact-item-card | 已完成（c0eb31c） |
+| T23 | 开发员 C｜多维筛选与折叠导航 | feat/multidim-sidebar | 已完成（fdc0655） |
+| T24 | 独立测试员｜V2.1 界面验收 | qa/v2.1 | 已通过（2a68e25） |
+| T25 | PM｜集成并启动隔离调试版 | integration/v2 | 已完成（调试版运行中） |
