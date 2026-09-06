@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { AppInfo, BackupInfo, Category, ItemInput, QuickBackupResult, RestoreResult, WorkItem, WorkItemsExportInput, WorkItemsExportResult } from './types';
+import type { AppInfo, BackupInfo, Category, FollowUpTemplate, FollowUpTemplateInput, ItemInput, QuickBackupResult, RestoreResult, WorkItem, WorkItemsExportInput, WorkItemsExportResult } from './types';
 export const api = {
   listItems: () => invoke<WorkItem[]>('list_items'),
   listCategories: () => invoke<Category[]>('list_categories'),
@@ -12,6 +12,10 @@ export const api = {
   renameCategory: (id: string, name: string) => invoke<Category[]>('rename_category', { id, name }),
   deleteCategory: (id: string) => invoke<Category[]>('delete_category', { id }),
   reorderCategories: (ids: string[]) => invoke<Category[]>('reorder_categories', { ids }),
+  listFollowUpTemplates: () => invoke<FollowUpTemplate[]>('list_follow_up_templates'),
+  createFollowUpTemplate: (input: FollowUpTemplateInput) => invoke<FollowUpTemplate[]>('create_follow_up_template', { input }),
+  updateFollowUpTemplate: (id: string, input: FollowUpTemplateInput) => invoke<FollowUpTemplate[]>('update_follow_up_template', { id, input }),
+  deleteFollowUpTemplate: (id: string) => invoke<FollowUpTemplate[]>('delete_follow_up_template', { id }),
   exportBackup: (path: string) => invoke<BackupInfo>('export_backup', { path }),
   quickBackup: () => invoke<QuickBackupResult>('quick_backup'),
   exportWorkItems: (input: WorkItemsExportInput) => invoke<WorkItemsExportResult>('export_work_items', { input }),

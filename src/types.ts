@@ -2,10 +2,12 @@ export type ItemStatus = 'todo' | 'doing' | 'done' | 'paused';
 export const STATUS_LABELS: Record<ItemStatus, string> = { todo: '待开展', doing: '进行中', done: '已完成', paused: '已暂停' };
 export interface Category { id: string; name: string; sortOrder: number }
 export interface FollowUp { id: string; text: string; done: boolean }
+export interface FollowUpTemplateInput { categoryId: string; name: string; items: string[] }
+export interface FollowUpTemplate extends FollowUpTemplateInput { id: string; sortOrder: number; createdAt: string; updatedAt: string }
 export interface ProgressEntry { id: string; content: string; createdAt: string }
 export interface ItemInput { title: string; content: string; categoryId: string | null; dueDate: string | null; status: ItemStatus; notes: string; followUps: FollowUp[] }
 export interface WorkItem extends ItemInput { id: string; createdAt: string; updatedAt: string; deletedAt: string | null; progress: ProgressEntry[] }
-export interface BackupInfo { schemaVersion: number; exportedAt: string; itemCount: number; categoryCount: number }
+export interface BackupInfo { schemaVersion: number; exportedAt: string; itemCount: number; categoryCount: number; templateCount?: number }
 export interface QuickBackupResult extends BackupInfo { path: string }
 export interface RestoreResult { safetyBackupPath: string; itemCount: number }
 export type ExportDateFilter = 'all' | 'today' | 'thisWeek' | 'nextWeek' | 'thisMonth' | 'nextMonth' | 'history' | 'overdue';

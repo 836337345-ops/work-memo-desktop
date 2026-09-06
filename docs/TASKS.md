@@ -35,3 +35,14 @@ V2 开发完成后只启动开发/调试版本供用户测试；用户明确说�
 | T23 | 开发员 C｜多维筛选与折叠导航 | feat/multidim-sidebar | 已完成（fdc0655） |
 | T24 | 独立测试员｜V2.1 界面验收 | qa/v2.1 | 已通过（2a68e25） |
 | T25 | PM｜集成并启动隔离调试版 | integration/v2 | 已完成（调试版运行中） |
+
+## V2.2 调整任务看板
+
+| 卡号 | 任务 | 分支 | 状态 |
+| --- | --- | --- | --- |
+| T30 | PM｜冻结 V2.2 公共接口与任务边界 | integration/v2 | 已完成 |
+| T31 | 开发员 A｜跟进清单模板数据与备份 | feat/follow-up-templates-data | 待分发 |
+| T32 | 开发员 B｜默认收起事项卡与完整进度 | feat/collapsible-item-card | 待分发 |
+| T33 | 开发员 C｜右侧统一保存与模板界面 | feat/explicit-editor-pane | 待分发 |
+| T34 | 独立测试员｜V2.2 验收 | qa/v2.2 | 待集成后分发 |
+| T35 | PM｜集成并启动隔离调试版 | integration/v2 | 待开始 |
