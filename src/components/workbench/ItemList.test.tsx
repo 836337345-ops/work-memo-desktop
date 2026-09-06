@@ -112,6 +112,29 @@ describe('事项卡内联编辑', () => {
     expect(await leave).toBe(true);
   });
 
+  it('离开保护在等待期间追加保存时会继续等待新保存', async () => {
+    let resolveA!: (item: WorkItem) => void;
+    let resolveB!: (item: WorkItem) => void;
+    vi.mocked(api.updateItem)
+      .mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveA = resolve; }))
+      .mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveB = resolve; }));
+    const ref = createRef<ItemListHandle>();
+    render(<ItemList {...props()} ref={ref} />);
+    const notes = screen.getByLabelText('联系客户的备注');
+    fireEvent.change(notes, { target: { value: '保存 A' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
+    const leave = ref.current?.prepareLeave();
+    let settled = false;
+    void leave?.then(() => { settled = true; });
+    fireEvent.change(notes, { target: { value: '保存 B' } });
+    resolveA(saved({ ...base, notes: '保存 A' }));
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    resolveB(saved({ ...base, notes: '保存 B' }));
+    expect(await leave).toBe(true);
+  });
+
   it('保存失败会阻止切换并保留卡片输入', async () => {
     vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('写入失败'));
     const ref = createRef<ItemListHandle>();
@@ -120,6 +143,19 @@ describe('事项卡内联编辑', () => {
     fireEvent.change(notes, { target: { value: '保留失败草稿' } });
     await screen.findByRole('alert');
     expect(notes.value).toBe('保留失败草稿');
+    expect(await ref.current?.prepareLeave()).toBe(false);
+  });
+
+  it('进度失败不会被普通字段保存清掉提示或离开保护', async () => {
+    vi.mocked(api.addProgress).mockRejectedValueOnce(new Error('进度写入失败'));
+    const ref = createRef<ItemListHandle>();
+    render(<ItemList {...props()} ref={ref} />);
+    fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '等待确认' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('进度写入失败');
+    fireEvent.change(screen.getByLabelText('联系客户的备注'), { target: { value: '普通字段保存成功' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalled());
+    expect(screen.getByRole('alert').textContent).toContain('进度写入失败');
     expect(await ref.current?.prepareLeave()).toBe(false);
   });
 

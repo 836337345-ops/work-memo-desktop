@@ -30,7 +30,8 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const [progressText, setProgressText] = useState('');
   const [saving, setSaving] = useState(0);
   const [progressSaving, setProgressSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [normalError, setNormalError] = useState<string | null>(null);
+  const [progressError, setProgressError] = useState<string | null>(null);
   const draftRef = useRef(draft);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
   const progressChainRef = useRef<Promise<void>>(Promise.resolve());
@@ -49,7 +50,8 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     draftRef.current = next;
     setProgress(item.progress);
     setProgressText('');
-    setSaveError(null);
+    setNormalError(null);
+    setProgressError(null);
     normalFailedRef.current = false;
     progressFailedRef.current = false;
     ownItemIdRef.current = item.id;
@@ -60,7 +62,8 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     const message = errorText(reason);
     if (kind === 'normal') normalFailedRef.current = true;
     else progressFailedRef.current = true;
-    setSaveError(message);
+    if (kind === 'normal') setNormalError(message);
+    else setProgressError(message);
     onError?.(message);
   };
 
@@ -70,19 +73,19 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     if (!next.title.trim()) {
       const message = '事项标题不能为空。';
       normalFailedRef.current = true;
-      setSaveError(message);
+      setNormalError(message);
       onError?.(message);
       return;
     }
     normalFailedRef.current = false;
-    setSaveError(null);
+    setNormalError(null);
     setSaving((count) => count + 1);
     const save = async () => {
       try {
         const saved = await api.updateItem(item.id, next);
         ownUpdateAtRef.current = saved.updatedAt;
         normalFailedRef.current = false;
-        setSaveError(null);
+        setNormalError(null);
         onChanged?.(saved);
       } catch (reason) {
         reportFailure(reason, 'normal');
@@ -102,13 +105,14 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     setProgressText('');
     progressTextRef.current = '';
     setProgressSaving(true);
-    setSaveError(null);
+    setProgressError(null);
     progressFailedRef.current = false;
     const save = async () => {
       try {
         const saved = await api.addProgress(item.id, content);
         ownUpdateAtRef.current = saved.updatedAt;
         progressFailedRef.current = false;
+        setProgressError(null);
         setProgress(saved.progress);
         onChanged?.(saved);
       } catch (reason) {
@@ -125,7 +129,13 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   };
 
   const prepareLeave = useCallback(async () => {
-    await Promise.all([writeChainRef.current, progressChainRef.current]);
+    // 等待到保存队列稳定：等待期间新输入会替换 ref，必须再等新队列。
+    while (true) {
+      const writes = writeChainRef.current;
+      const progressWrites = progressChainRef.current;
+      await Promise.all([writes, progressWrites]);
+      if (writes === writeChainRef.current && progressWrites === progressChainRef.current) break;
+    }
     return !normalFailedRef.current && !progressFailedRef.current;
   }, []);
   useEffect(() => { onRegister({ prepareLeave }); return () => onRegister(null); }, [onRegister, prepareLeave]);
@@ -148,7 +158,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
         <section aria-label="最新进度"><b>最新进度</b><p>{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
         <section aria-label="跟进清单"><b>跟进清单</b>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} /><input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul>{!readOnly && <button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button>}</section>
         <label><b>备注</b><textarea aria-label={`${item.title}的备注`} value={draft.notes} disabled={readOnly} onChange={(event) => update('notes', event.target.value)} placeholder="添加备注" rows={2} /></label>
-        {saving > 0 && <small>正在保存…</small>}{saveError && <p role="alert">保存失败：{saveError}</p>}
+        {saving > 0 && <small>正在保存…</small>}{normalError && <p role="alert">保存失败：{normalError}</p>}{progressError && <p role="alert">进度提交失败：{progressError}</p>}
       </div>
     </article>
   </li>;
