@@ -8,6 +8,7 @@ const uiReady = process.env.QA_UI_READY === '1';
 type BrowserState = {
   items: Array<Record<string, unknown>>;
   categories: Array<Record<string, unknown>>;
+  templates: Array<Record<string, unknown>>;
   failures?: Record<string, string>;
 };
 
@@ -23,10 +24,14 @@ const seed: BrowserState = {
     { id: 'cat-expansion-5', name: '拓展五', sortOrder: 7 },
   ],
   items: [
-    { id: 'item-current', title: '样板间开放推广', content: '协调海报、渠道物料与到访动线。', categoryId: 'cat-promotion', dueDate: '2026-09-07', status: 'doing', notes: '优先核对到访动线。', followUps: [{ id: 'follow-1', text: '确认渠道海报尺寸', done: false }, { id: 'follow-2', text: '核验活动物料', done: false }, { id: 'follow-3', text: '同步销售排班', done: false }, { id: 'follow-4', text: '复核接待动线', done: false }], progress: [{ id: 'progress-1', content: '已收集三家渠道的物料清单。', createdAt: '2026-09-06T09:00:00.000Z' }], createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z', deletedAt: null },
+    { id: 'item-current', title: '样板间开放推广', content: '协调海报、渠道物料与到访动线。', categoryId: 'cat-promotion', dueDate: '2026-09-07', status: 'doing', notes: '优先核对到访动线。', followUps: [{ id: 'follow-1', text: '确认渠道海报尺寸', done: false }, { id: 'follow-2', text: '核验活动物料', done: false }, { id: 'follow-3', text: '同步销售排班', done: false }, { id: 'follow-4', text: '复核接待动线', done: false }], progress: [{ id: 'progress-1', content: '已收集三家渠道的物料清单。\n下一步安排周五现场复核。', createdAt: '2026-09-06T09:00:00.000Z' }], createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z', deletedAt: null },
     { id: 'item-done-history', title: '已完成活动复盘', content: '整理活动到访数据。', categoryId: 'cat-event', dueDate: '2026-09-01', status: 'done', notes: '归档完成。', followUps: [], progress: [{ id: 'progress-2', content: '复盘已发出。', createdAt: '2026-09-02T09:00:00.000Z' }], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
     { id: 'item-paused-history', title: '暂停包装更新', content: '等待新包装规范。', categoryId: 'cat-package', dueDate: '2026-09-02', status: 'paused', notes: '暂缓执行。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
     { id: 'item-overdue', title: '逾期渠道物料', content: '补齐渠道物料清单。', categoryId: 'cat-promotion', dueDate: '2026-09-04', status: 'todo', notes: '等待供应商报价。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+  ],
+  templates: [
+    { id: 'template-promotion', categoryId: 'cat-promotion', name: '开放日流程', items: ['确认场地', '邀约客户', '准备物料'], sortOrder: 0, createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z' },
+    { id: 'template-event', categoryId: 'cat-event', name: '活动复盘', items: ['汇总到访', '整理反馈'], sortOrder: 0, createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z' },
   ],
 };
 
@@ -61,6 +66,7 @@ async function mockIpc(page: Page, state: BrowserState = seed) {
       return found;
     };
     window.confirm = () => true;
+    (window as any).__QA_IPC_CALLS__ = [];
     window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ ?? {};
     window.__TAURI_INTERNALS__.metadata = {
       currentWindow: { label: 'main' },
@@ -71,6 +77,7 @@ async function mockIpc(page: Page, state: BrowserState = seed) {
     window.__TAURI_EVENT_PLUGIN_INTERNALS__ = window.__TAURI_EVENT_PLUGIN_INTERNALS__ ?? {};
     window.__TAURI_EVENT_PLUGIN_INTERNALS__.unregisterListener = () => {};
     window.__TAURI_INTERNALS__.invoke = async (command: string, payload: Record<string, any> = {}) => {
+      (window as any).__QA_IPC_CALLS__.push({ command, payload });
       const failure = state.failures?.[command];
       if (failure) throw new Error(failure);
       switch (command) {
@@ -101,11 +108,35 @@ async function mockIpc(page: Page, state: BrowserState = seed) {
         case 'delete_category': {
           state.categories = state.categories.filter((value) => value.id !== payload.id);
           state.items.forEach((value) => { if (value.categoryId === payload.id) value.categoryId = null; });
+          state.templates = state.templates.filter((value) => value.categoryId !== payload.id);
           return structuredClone(state.categories);
         }
         case 'reorder_categories': state.categories = payload.ids.map((id: string, index: number) => ({ ...category(id), sortOrder: index })); return structuredClone(state.categories);
-        case 'export_backup': return { schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length };
-        case 'quick_backup': return { path: 'C:/qa-isolated/备份/工作备份文件20260906.json', schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length };
+        case 'list_follow_up_templates': return structuredClone(state.templates);
+        case 'create_follow_up_template': {
+          const input = payload.input as { categoryId: string; name: string; items: string[] };
+          const name = String(input.name ?? '').trim(); const items = (input.items ?? []).map((value: string) => value.trim()).filter(Boolean);
+          if (!name || !items.length) throw new Error('模板名称和清单不能为空。');
+          if (new Set(items).size !== items.length) throw new Error('模板清单中不能有重复项目。');
+          if (state.templates.some((value) => value.categoryId === input.categoryId && value.name === name)) throw new Error('同一分类内模板名称不能重复。');
+          state.templates.push({ ...input, categoryId: input.categoryId, name, items, id: `template-${state.templates.length + 1}`, sortOrder: state.templates.filter((value) => value.categoryId === input.categoryId).length, createdAt: now, updatedAt: now });
+          return structuredClone(state.templates);
+        }
+        case 'update_follow_up_template': {
+          const existing = state.templates.find((value) => value.id === payload.id);
+          if (!existing) throw new Error('未找到该模板。');
+          const input = payload.input as { categoryId: string; name: string; items: string[] };
+          const name = String(input.name ?? '').trim(); const items = (input.items ?? []).map((value: string) => value.trim()).filter(Boolean);
+          if (!name || !items.length || new Set(items).size !== items.length) throw new Error('模板内容无效。');
+          if (state.templates.some((value) => value.id !== payload.id && value.categoryId === input.categoryId && value.name === name)) throw new Error('同一分类内模板名称不能重复。');
+          Object.assign(existing, { ...input, name, items, updatedAt: now }); return structuredClone(state.templates);
+        }
+        case 'delete_follow_up_template': {
+          if (!state.templates.some((value) => value.id === payload.id)) throw new Error('未找到该模板。');
+          state.templates = state.templates.filter((value) => value.id !== payload.id); return structuredClone(state.templates);
+        }
+        case 'export_backup': return { schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length, templateCount: state.templates.length };
+        case 'quick_backup': return { path: 'C:/qa-isolated/备份/工作备份文件20260906.json', schemaVersion: 1, exportedAt: now, itemCount: state.items.length, categoryCount: state.categories.length, templateCount: state.templates.length };
         case 'export_work_items': return { path: payload.input.path, itemCount: 2, categoryCount: 2 };
         case 'inspect_backup': return { schemaVersion: 1, exportedAt: now, itemCount: 1, categoryCount: 3 };
         case 'restore_backup': return { safetyBackupPath: 'C:/qa-isolated/backup-before-restore.json', itemCount: 1 };
@@ -156,11 +187,14 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(overdue.getByText('逾期', { exact: true })).toBeVisible();
   });
 
-  test('紧凑事项卡标题同行有状态和最右编辑，标题/情况只读，进度备注可展开，跟进最多三条', async ({ page }) => {
+  test('事项卡默认收起，完整显示最新进度；展开后仅编辑状态、进度和跟进', async ({ page }) => {
     const card = page.getByRole('article', { name: '事项：样板间开放推广' });
-    await expect(card.getByLabel('样板间开放推广的标题')).toHaveCount(0);
-    await expect(card.getByLabel('样板间开放推广的情况')).toHaveCount(0);
-    await expect(card.getByRole('button', { name: '一键完成' })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: '展开事项' })).toBeVisible();
+    await expect(card.locator('.item-card__progress-full')).toContainText('已收集三家渠道的物料清单。');
+    await expect(card.locator('.item-card__progress-full')).toContainText('下一步安排周五现场复核。');
+    await expect(card.getByText('情况', { exact: true })).toHaveCount(0);
+    await expect(card.getByText('备注', { exact: true })).toHaveCount(0);
+    await expect(card.getByLabel('跟进内容')).toHaveCount(0);
     const header = card.locator('.item-card__header');
     const title = header.locator('strong');
     const status = header.getByLabel('样板间开放推广的状态');
@@ -171,15 +205,15 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     expect(statusBox && editBox && editBox.x).toBeGreaterThan(statusBox?.x ?? 0);
     await expect(header).toHaveCSS('border-bottom-width', '1px');
 
-    await card.getByRole('button', { name: '已收集三家渠道的物料清单。' }).click();
-    await expect(card.getByLabel('新增进度')).toBeVisible();
-    await card.getByRole('button', { name: '优先核对到访动线。' }).click();
-    await expect(card.getByLabel('样板间开放推广的备注')).toBeVisible();
-    await expect(card.getByLabel('跟进内容')).toHaveCount(3);
-    await card.getByRole('button', { name: '展开全部（4）' }).click();
+    await card.getByRole('button', { name: '展开事项' }).click();
+    await expect(card.getByText('协调海报、渠道物料与到访动线。', { exact: true })).toBeVisible();
+    await expect(card.getByText('优先核对到访动线。', { exact: true })).toBeVisible();
     await expect(card.getByLabel('跟进内容')).toHaveCount(4);
-    await card.getByRole('button', { name: '收起跟进' }).click();
-    await expect(card.getByLabel('跟进内容')).toHaveCount(3);
+    await expect(card.getByLabel('跟进内容').first()).toBeEnabled();
+    await expect(card.getByText('协调海报、渠道物料与到访动线。', { exact: true }).locator('..').locator('input,textarea')).toHaveCount(0);
+    await card.getByLabel('新增进度').fill('已完成周五现场复核');
+    await card.getByRole('button', { name: '提交新进度' }).click();
+    await expect(card.getByRole('button', { name: '展开事项' })).toBeVisible();
   });
 
   test('三栏在小窗口各自可滚动到底部，状态灯颜色正确且减少动画时停止动画', async ({ page }) => {
@@ -200,15 +234,79 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect.poll(() => page.locator('.item-card .status-dot').first().evaluate((node) => getComputedStyle(node).animationName)).toBe('none');
   });
 
-  test('内联快速保存失败时提示中文错误并保留输入', async ({ page }) => {
-    await mockIpc(page, { ...seed, failures: { update_item: '保存失败：测试磁盘不可用' } });
+  test('内联进度提交失败时提示中文错误、保留输入并保持展开', async ({ page }) => {
+    await mockIpc(page, { ...seed, failures: { add_progress: '保存失败：测试磁盘不可用' } });
     await page.reload();
     const card = page.getByRole('article', { name: '事项：样板间开放推广' });
-    await card.getByRole('button', { name: '优先核对到访动线。' }).click();
-    const notes = card.getByLabel('样板间开放推广的备注');
-    await notes.fill('不得丢失的备注');
-    await expect(notes).toHaveValue('不得丢失的备注');
-    await expect(page.getByText('保存失败：测试磁盘不可用', { exact: true })).toBeVisible();
+    await card.getByRole('button', { name: '展开事项' }).click();
+    const progress = card.getByLabel('新增进度');
+    await progress.fill('不得丢失的进度');
+    await card.getByRole('button', { name: '提交新进度' }).click();
+    await expect(progress).toHaveValue('不得丢失的进度');
+    await expect(page.getByText('进度提交失败：保存失败：测试磁盘不可用', { exact: true })).toBeVisible();
+    await expect(card.getByRole('button', { name: '收起事项' })).toBeVisible();
+  });
+
+  test('编辑器默认隐藏，仅新建或修改编辑打开；普通字段不自动写入且保存失败保留输入', async ({ page }) => {
+    await expect(page.locator('.editor-pane')).not.toBeVisible();
+    await page.getByRole('button', { name: '＋ 新建事项' }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    await expect(editor).toBeVisible();
+    await expect(editor.getByRole('button', { name: '关闭', exact: true })).toHaveCount(0);
+    const before = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => ['create_item', 'update_item'].includes(call.command)).length);
+    await editor.getByLabel(/事项标题/).fill('只在点击保存时写入');
+    const afterTyping = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => ['create_item', 'update_item'].includes(call.command)).length);
+    expect(afterTyping).toBe(before);
+    await editor.getByRole('button', { name: '创建并关闭' }).click();
+    await expect(editor).not.toBeVisible();
+    await page.getByRole('article', { name: '事项：只在点击保存时写入' }).getByRole('button', { name: '修改编辑' }).click();
+    await expect(page.getByRole('region', { name: '事项编辑器' })).toBeVisible();
+
+    await mockIpc(page, { ...seed, failures: { update_item: '保存失败：编辑器测试' } });
+    await page.reload();
+    await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
+    const failedEditor = page.getByRole('region', { name: '事项编辑器' });
+    const title = failedEditor.getByLabel(/事项标题/);
+    await title.fill('失败后仍保留');
+    await failedEditor.getByRole('button', { name: '保存并关闭' }).click();
+    await expect(page.getByText('保存失败：编辑器测试', { exact: true })).toBeVisible();
+    await expect(title).toHaveValue('失败后仍保留');
+    await expect(failedEditor).toBeVisible();
+  });
+
+  test('跟进模板按真实类别隔离，应用会 trim 去重；未分类不显示模板入口', async ({ page }) => {
+    await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    await editor.getByRole('button', { name: '模板管理与应用' }).click();
+    await expect(editor.getByText('开放日流程', { exact: true })).toBeVisible();
+    await expect(editor.getByText('活动复盘', { exact: true })).toHaveCount(0);
+    await editor.getByRole('button', { name: '应用' }).click();
+    await expect(editor.getByLabel('跟进内容')).toHaveCount(7);
+    const values = await editor.getByLabel('跟进内容').evaluateAll((nodes) => nodes.map((node) => (node as HTMLInputElement).value));
+    expect(values.filter((value) => value === '确认场地')).toHaveLength(1);
+
+    await editor.getByLabel('所属类别').selectOption('');
+    await expect(editor.getByRole('button', { name: '模板管理与应用' })).toHaveCount(0);
+    await expect(editor.getByRole('button', { name: '＋ 新建模板' })).toHaveCount(0);
+  });
+
+  test('模板新增重复名称时弹窗显示错误并保留填写内容，成功创建后可删除', async ({ page }) => {
+    await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    await editor.getByRole('button', { name: '＋ 新建模板' }).click();
+    const dialog = page.getByRole('dialog', { name: '跟进模板' });
+    await dialog.getByLabel('模板名称').fill('开放日流程');
+    await dialog.getByLabel('模板文字项 1').fill('确认场地');
+    await dialog.getByRole('button', { name: '保存模板' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('不能重复');
+    await expect(dialog.getByLabel('模板名称')).toHaveValue('开放日流程');
+    await dialog.getByLabel('模板名称').fill('临时模板');
+    await dialog.getByLabel('模板文字项 1').fill('临时事项');
+    await dialog.getByRole('button', { name: '保存模板' }).click();
+    await editor.getByRole('button', { name: '模板管理与应用' }).click();
+    await expect(editor.getByText('临时模板', { exact: true })).toBeVisible();
+    await editor.getByRole('button', { name: '删除模板：临时模板' }).click();
+    await expect(editor.getByText('临时模板', { exact: true })).toHaveCount(0);
   });
 
   test('一键备份显示本地路径，并可三维多选导出 TXT 成功反馈', async ({ page }) => {
