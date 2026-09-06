@@ -26,6 +26,7 @@ describe('事项卡内联编辑', () => {
     expect((screen.getByLabelText('跟进内容') as HTMLInputElement).value).toBe('确认联系人');
     fireEvent.click(screen.getByRole('button', { name: '优先电话沟通' }));
     expect((screen.getByLabelText('联系客户的备注') as HTMLTextAreaElement).value).toBe('优先电话沟通');
+    expect(screen.getByText('逾期')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '修改编辑' }));
     expect(next.onSelect).toHaveBeenCalledWith(base);
   });

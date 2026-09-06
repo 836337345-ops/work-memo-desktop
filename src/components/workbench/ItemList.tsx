@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
 import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
+import { isOverdue } from '../../lib/filters';
 
 interface ItemListProps {
   items: WorkItem[];
@@ -146,7 +147,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     <article className="item-card" aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <span className={`status-dot ${draft.status}`} aria-hidden="true" />
-        <div className="item-copy"><strong>{draft.title}</strong><small>{categoryName} · {formatDate(item.dueDate)}</small></div>
+        <div className="item-copy"><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong><small>{categoryName} · {formatDate(item.dueDate)}</small></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
         {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
