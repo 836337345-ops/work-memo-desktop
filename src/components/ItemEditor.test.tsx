@@ -43,9 +43,32 @@ describe('V2.2 ItemEditor', () => {
   });
 
   it('只展示当前类别模板，应用时按 trim 后文字跳过重复项', async () => {
-    const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '健康讲座', items: ['确认场地', '邀约客户'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]);
+    const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '健康讲座', items: ['确认场地', '邀约客户', ' 邀约客户 '], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]);
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat', followUps: [{ id: 'f1', text: ' 确认场地 ', done: false }] })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
     fireEvent.click(screen.getByRole('button', { name: '模板管理与应用' })); await waitFor(() => expect(screen.getByText('健康讲座')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '应用' }));
     expect(screen.getAllByLabelText('跟进内容')).toHaveLength(2); expect((screen.getAllByLabelText('跟进内容')[1] as HTMLInputElement).value).toBe('邀约客户');
+  });
+
+  it('可新建模板并提交名称与有序文字项', async () => {
+    const created: FollowUpTemplate = { id: 'tpl-new', categoryId: 'cat', name: '车库开放', items: ['确认流程'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.createFollowUpTemplate).mockResolvedValue([created]);
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' }));
+    fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '车库开放' } }); fireEvent.change(screen.getByLabelText('模板文字项 1'), { target: { value: '确认流程' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    await waitFor(() => expect(api.createFollowUpTemplate).toHaveBeenCalledWith({ categoryId: 'cat', name: '车库开放', items: ['确认流程'] }));
+  });
+
+  it('可编辑已有模板并保留当前类别', async () => {
+    const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '旧模板', items: ['旧事项'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]); vi.mocked(api.updateFollowUpTemplate).mockResolvedValue([{ ...template, name: '新模板' }]);
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '模板管理与应用' })); await waitFor(() => expect(screen.getByText('旧模板')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '编辑' }));
+    fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '新模板' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' })); await waitFor(() => expect(api.updateFollowUpTemplate).toHaveBeenCalledWith('tpl-1', { categoryId: 'cat', name: '新模板', items: ['旧事项'] }));
+  });
+
+  it('可删除已有模板', async () => {
+    const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '待删除', items: ['确认'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]); vi.mocked(api.deleteFollowUpTemplate).mockResolvedValue([]);
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '模板管理与应用' })); await waitFor(() => expect(screen.getByText('待删除')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '删除模板：待删除' })); await waitFor(() => expect(api.deleteFollowUpTemplate).toHaveBeenCalledWith('tpl-1'));
+  });
+
+  it('模板校验失败时在弹窗内显示错误并保留输入', async () => {
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' })); fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '保留名称' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    const alert = await screen.findByRole('alert'); expect(alert.textContent).toContain('请填写模板名称'); expect((screen.getByLabelText('模板名称') as HTMLInputElement).value).toBe('保留名称'); expect(screen.getByRole('dialog')).toBeTruthy();
   });
 });
