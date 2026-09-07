@@ -8,7 +8,7 @@ import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
 
 vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn() } }));
 
-const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'todo', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
+const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'doing', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
 const categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }];
 const saved = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem => ({ ...base, ...input, updatedAt: '2026-01-02T00:00:00Z', ...overrides });
 const props = () => ({ items: [base], categories, selectedId: null, onSelect: vi.fn(), onChanged: vi.fn(), onError: vi.fn() });
@@ -68,6 +68,11 @@ describe('V2.2 可折叠事项卡', () => {
     expect(screen.queryByLabelText('联系客户的情况')).toBeNull();
     expect(screen.queryByLabelText('联系客户的备注')).toBeNull();
     expect(screen.queryByRole('button', { name: '一键完成' })).toBeNull();
+    const followUpSection = screen.getByRole('region', { name: '跟进清单' });
+    const heading = followUpSection.querySelector('.item-card__follow-up-heading') as HTMLElement;
+    expect(heading.textContent).toContain('跟进清单');
+    expect(heading.textContent).toContain('添加跟进');
+    expect(heading.querySelector('button')).toBeTruthy();
   });
 
   it('详情编辑器回传同一事项的新版本时同步最新进度与状态', () => {
