@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
-import { STATUS_LABELS, type Category, type ItemStatus, type WorkItem } from '../../types';
+import { type Category, type WorkItem } from '../../types';
 import { buildCalendarGrid, dateKey, holidaysForYear, monthTitle, shiftMonth, WEEKDAY_LABELS } from './calendar';
 import './calendar.css';
 
-interface WorkCalendarProps { items: WorkItem[]; categories?: Category[]; onClose: () => void; }
-const statusOrder: ItemStatus[] = ['todo', 'doing', 'done', 'paused'];
+interface WorkCalendarProps { items: WorkItem[]; categories?: Category[]; onClose: () => void; onOpenItem?: (id: string) => void; onNewItem?: (date: string) => void; }
 
 function localTodayKey(): string { return dateKey(new Date()); }
 
-export function WorkCalendar({ items, categories = [], onClose }: WorkCalendarProps) {
+export function WorkCalendar({ items, categories = [], onClose, onOpenItem, onNewItem }: WorkCalendarProps) {
   const [month, setMonth] = useState(() => new Date());
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Array<string | null>>([]);
   const today = localTodayKey();
@@ -32,14 +31,12 @@ export function WorkCalendar({ items, categories = [], onClose }: WorkCalendarPr
     <div className="work-calendar__weekdays" aria-hidden="true">{WEEKDAY_LABELS.map((label) => <span className="work-calendar__weekday" key={label}>周{label}</span>)}</div>
     <div className="work-calendar__grid" role="grid" aria-label={`${monthTitle(month)}月历`}>{days.map((day) => {
       const dayItems = itemsByDate.get(day.key) ?? [];
-      const counts = statusOrder.map((status) => ({ status, count: dayItems.filter((item) => item.status === status).length })).filter((entry) => entry.count > 0);
       const holiday = holidays.get(day.key);
       const weekend = day.date.getDay() === 0 || day.date.getDay() === 6;
       return <div className={`work-calendar__day${day.inCurrentMonth ? '' : ' work-calendar__day--outside'}${day.key === today ? ' work-calendar__day--today' : ''}${holiday || weekend ? ' work-calendar__day--red-date' : ''}`} data-date={day.key} role="gridcell" key={day.key}>
-        <div className="work-calendar__date-row"><button className="work-calendar__number" type="button" aria-label={`${day.key}${dayItems.length ? `，${dayItems.length}条事项` : ''}`} tabIndex={dayItems.length ? 0 : -1}>{day.day}</button>{holiday && <span className="work-calendar__festival" title={holiday}>{holiday}</span>}</div>
-        {dayItems.length > 0 && <div className="work-calendar__titles">{dayItems.slice(0, 3).map((item) => <div className="work-calendar__title" title={item.title} key={item.id}>{item.title}</div>)}{dayItems.length > 3 && <div className="work-calendar__more">另有 {dayItems.length - 3} 项</div>}</div>}
-        {counts.length > 0 && <div className="work-calendar__markers" aria-label={`共${dayItems.length}条事项`}>{counts.map(({ status, count }) => <span className={`work-calendar__status work-calendar__status--${status}`} key={status} title={STATUS_LABELS[status]} aria-label={`${STATUS_LABELS[status]} ${count}条`}>{count}</span>)}</div>}
-        {dayItems.length > 0 && <div className="work-calendar__popover" role="tooltip"><p className="work-calendar__popover-title">当日事项</p><ul>{dayItems.map((item) => <li key={item.id}>{item.title}</li>)}</ul></div>}
+        <div className="work-calendar__date-row"><button className="work-calendar__number" type="button" aria-label={`${day.key}${dayItems.length ? `，${dayItems.length}条事项` : ''}`} tabIndex={0}>{day.day}</button>{holiday && <span className="work-calendar__festival" title={holiday}>{holiday}</span>}</div>
+        {dayItems.length > 0 && <div className="work-calendar__titles">{dayItems.slice(0, 3).map((item) => <div className="work-calendar__title-row" title={item.title} key={item.id}><span className={`work-calendar__item-status work-calendar__item-status--${item.status}`} aria-hidden="true" /><span className="work-calendar__title">{item.title}</span></div>)}{dayItems.length > 3 && <div className="work-calendar__more">另有 {dayItems.length - 3} 项</div>}</div>}
+        <div className="work-calendar__popover" role="tooltip"><p className="work-calendar__popover-title">{dayItems.length > 0 ? '当日事项' : '当日暂无事项'}</p>{dayItems.length > 0 && <ul>{dayItems.map((item) => <li key={item.id}><button className="work-calendar__item-button" type="button" onClick={() => onOpenItem?.(item.id)}><span className={`work-calendar__item-status work-calendar__item-status--${item.status}`} aria-hidden="true" /><span>{item.title}</span></button></li>)}</ul>}<button className="work-calendar__new-item" type="button" onClick={() => onNewItem?.(day.key)}>新增计划</button></div>
       </div>;
     })}</div>
   </section>;

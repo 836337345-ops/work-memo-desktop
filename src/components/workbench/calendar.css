@@ -30,18 +30,22 @@
 .work-calendar__day--outside .work-calendar__number { color: #a6b5ad; }
 .work-calendar__day--outside.work-calendar__day--red-date .work-calendar__number { color: #d18d88; }
 .work-calendar__titles { min-width: 0; margin-top: 6px; }
-.work-calendar__title, .work-calendar__more { overflow: hidden; color: #36574a; font-size: 11px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.work-calendar__title-row { display: flex; min-width: 0; align-items: center; gap: 4px; line-height: 1.45; }
+.work-calendar__title, .work-calendar__more { min-width: 0; overflow: hidden; color: #36574a; font-size: 11px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .work-calendar__more { color: #71877d; font-weight: 700; }
-.work-calendar__markers { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
-.work-calendar__status { display: inline-flex; align-items: center; gap: 3px; color: #5c756a; font-size: 11px; font-weight: 700; }
-.work-calendar__status::before { width: 7px; height: 7px; border-radius: 50%; background: #9aa7a1; content: ''; }
-.work-calendar__status--doing::before { background: #39a978; }
-.work-calendar__status--done::before { background: #e4a13e; }
-.work-calendar__status--paused::before { background: #da6662; }
-.work-calendar__status--todo::before { background: #9aa7a1; }
-.work-calendar__popover { position: absolute; z-index: 3; top: 29px; right: 6px; left: 6px; max-height: 170px; overflow-y: auto; border: 1px solid #c9ddd0; border-radius: 7px; padding: 8px 9px; color: #28473b; background: #fff; box-shadow: 0 8px 22px #315c4626; opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity .12s ease, transform .12s ease; }
+.work-calendar__item-status { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #9aa7a1; animation: work-calendar-breathe 1.8s ease-in-out infinite; }
+.work-calendar__item-status--doing { background: #39a978; }
+.work-calendar__item-status--done { background: #e4a13e; }
+.work-calendar__item-status--paused { background: #da6662; }
+.work-calendar__item-status--todo { background: #9aa7a1; }
+.work-calendar__popover { position: absolute; z-index: 3; top: 29px; right: 6px; left: 6px; max-height: 190px; overflow-y: auto; border: 1px solid #c9ddd0; border-radius: 7px; padding: 8px 9px; color: #28473b; background: #fff; box-shadow: 0 8px 22px #315c4626; opacity: 0; pointer-events: none; transform: translateY(-3px); transition: opacity .12s ease, transform .12s ease; }
 .work-calendar__day:hover .work-calendar__popover, .work-calendar__day:focus-within .work-calendar__popover { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .work-calendar__popover-title { margin: 0 0 5px; color: #6b8177; font-size: 11px; font-weight: 800; }
 .work-calendar__popover ul { margin: 0; padding-left: 16px; color: #36574a; font-size: 12px; line-height: 1.5; }
-@media (max-width: 1130px) { .work-calendar { padding: 18px 19px 22px; }.work-calendar__header { align-items: flex-start; flex-direction: column; }.work-calendar__actions { width: 100%; flex-wrap: wrap; }.work-calendar__grid { grid-template-rows: repeat(6, minmax(82px, 1fr)); }.work-calendar__day { min-height: 82px; padding: 6px; }.work-calendar__markers { gap: 3px; margin-top: 6px; }.work-calendar__status { font-size: 10px; } }
-@media (prefers-reduced-motion: reduce) { .work-calendar__popover { transition: none; } }
+.work-calendar__item-button { display: flex; width: 100%; align-items: center; gap: 5px; border: 0; padding: 1px 0; color: #36574a; background: transparent; font-size: 12px; text-align: left; }
+.work-calendar__item-button:hover, .work-calendar__item-button:focus-visible { color: #166047; text-decoration: underline; }
+.work-calendar__new-item { width: 100%; margin-top: 8px; border: 1px solid #bdd8c7; border-radius: 5px; padding: 4px 7px; color: #27634f; background: #f7fbf8; font-size: 11px; font-weight: 700; }
+.work-calendar__new-item:hover, .work-calendar__new-item:focus-visible { background: #e5f3e9; }
+@keyframes work-calendar-breathe { 0%, 100% { opacity: .72; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.25); } }
+@media (max-width: 1130px) { .work-calendar { padding: 18px 19px 22px; }.work-calendar__header { align-items: flex-start; flex-direction: column; }.work-calendar__actions { width: 100%; flex-wrap: wrap; }.work-calendar__grid { grid-template-rows: repeat(6, minmax(82px, 1fr)); }.work-calendar__day { min-height: 82px; padding: 6px; } }
+@media (prefers-reduced-motion: reduce) { .work-calendar__popover, .work-calendar__item-status { transition: none; animation: none; } }

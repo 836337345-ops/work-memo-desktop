@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkCalendar } from './WorkCalendar';
 import { holidaysForYear } from './calendar';
@@ -18,15 +18,16 @@ describe('WorkCalendar', () => {
     expect(document.querySelector('.work-calendar__title')?.textContent).toBe('今天事项');
     expect(screen.queryByText('回收站事项')).toBeNull();
     expect(screen.queryByText('无日期事项')).toBeNull();
-    expect(screen.getByTitle('进行中')).toBeTruthy();
+    expect(document.querySelector('.work-calendar__item-status--doing')).toBeTruthy();
+    expect(document.querySelector('.work-calendar__status')).toBeNull();
   });
 
   it('悬停或聚焦日期时提供当日全部事项标题', () => {
-    render(<WorkCalendar items={[makeItem(), makeItem({ id: 'item-2', title: '第二项', status: 'done' })]} onClose={vi.fn()} />);
+    const { container } = render(<WorkCalendar items={[makeItem(), makeItem({ id: 'item-2', title: '第二项', status: 'done' })]} onClose={vi.fn()} />);
     const dayButton = screen.getByRole('button', { name: /2026-09-07/ });
     fireEvent.focus(dayButton);
-    expect(screen.getByRole('tooltip')).toBeTruthy();
-    expect(screen.getByRole('tooltip').textContent).toContain('第二项');
+    const tooltip = within(container.querySelector('[data-date="2026-09-07"]') as HTMLElement).getByRole('tooltip');
+    expect(tooltip.textContent).toContain('第二项');
   });
 
   it('日期格最多直显三条标题，更多事项显示汇总', () => {
@@ -63,10 +64,33 @@ describe('WorkCalendar', () => {
       makeItem({ id: 'paused', status: 'paused' }),
       makeItem({ id: 'done', status: 'done' }),
     ]} onClose={vi.fn()} />);
-    expect(container.querySelector('.work-calendar__status--todo')).toBeTruthy();
-    expect(container.querySelector('.work-calendar__status--doing')).toBeTruthy();
-    expect(container.querySelector('.work-calendar__status--paused')).toBeTruthy();
-    expect(container.querySelector('.work-calendar__status--done')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__item-status--todo')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__item-status--doing')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__item-status--paused')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__item-status--done')).toBeTruthy();
+    expect(container.querySelector('.work-calendar__status')).toBeNull();
+  });
+
+  it('事项按钮和新增计划按钮调用对应日期回调', () => {
+    const onOpenItem = vi.fn();
+    const onNewItem = vi.fn();
+    const { container } = render(<WorkCalendar items={[makeItem()]} onClose={vi.fn()} onOpenItem={onOpenItem} onNewItem={onNewItem} />);
+    const tooltip = within(container.querySelector('[data-date="2026-09-07"]') as HTMLElement).getByRole('tooltip');
+    fireEvent.click(within(tooltip).getByRole('button', { name: '今天事项' }));
+    fireEvent.click(within(tooltip).getByRole('button', { name: '新增计划' }));
+    expect(onOpenItem).toHaveBeenCalledWith('item-1');
+    expect(onNewItem).toHaveBeenCalledWith('2026-09-07');
+  });
+
+  it('没有事项的日期也能聚焦显示空浮窗并新增计划', () => {
+    const onNewItem = vi.fn();
+    const { container } = render(<WorkCalendar items={[]} onClose={vi.fn()} onNewItem={onNewItem} />);
+    const dayCell = container.querySelector('[data-date="2026-09-08"]') as HTMLElement;
+    fireEvent.focus(within(dayCell).getByRole('button', { name: '2026-09-08' }));
+    const tooltip = within(dayCell).getByRole('tooltip');
+    expect(tooltip.textContent).toContain('当日暂无事项');
+    fireEvent.click(within(tooltip).getByRole('button', { name: '新增计划' }));
+    expect(onNewItem).toHaveBeenCalledWith('2026-09-08');
   });
 
   it('支持上月、今天、下月和关闭日历', () => {
