@@ -6,15 +6,16 @@ import './editor.css';
 
 const makeId = (prefix: string) => globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
+const initialDraft = (item: ItemInput | null, defaultCategoryId: string | null, defaultDueDate: string | null): ItemInput => item ? toInput(item) : { ...emptyItem(defaultCategoryId), dueDate: defaultDueDate ?? null };
 const hasDraft = (item: ItemInput) => Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.dueDate || item.followUps.length);
 
-const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor({ item, categories, defaultCategoryId = null, onSaved, onDeleted, onCancel }, ref) {
-  const [draft, setDraft] = useState<ItemInput>(() => item ? toInput(item) : emptyItem(defaultCategoryId));
+const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor({ item, categories, defaultCategoryId = null, defaultDueDate = null, onSaved, onDeleted, onCancel }, ref) {
+  const [draft, setDraft] = useState<ItemInput>(() => initialDraft(item, defaultCategoryId, defaultDueDate));
   const [itemId, setItemId] = useState<string | null>(item?.id ?? null); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<FollowUpTemplate[]>([]); const [templateError, setTemplateError] = useState(''); const [templatesExpanded, setTemplatesExpanded] = useState(false); const [templateEditorOpen, setTemplateEditorOpen] = useState(false); const [editingTemplate, setEditingTemplate] = useState<FollowUpTemplate | null>(null); const [templateName, setTemplateName] = useState(''); const [templateItems, setTemplateItems] = useState<string[]>(['']); const [templateSaving, setTemplateSaving] = useState(false);
   const draftRef = useRef(draft); const itemIdRef = useRef(itemId); const savedDraftRef = useRef(toInput(draft)); const onSavedRef = useRef(onSaved);
   useEffect(() => { onSavedRef.current = onSaved; }, [onSaved]); useEffect(() => { draftRef.current = draft; }, [draft]); useEffect(() => { itemIdRef.current = itemId; }, [itemId]);
-  useEffect(() => { const next = item ? toInput(item) : emptyItem(defaultCategoryId); setDraft(next); draftRef.current = next; savedDraftRef.current = next; setItemId(item?.id ?? null); itemIdRef.current = item?.id ?? null; setError(null); }, [item?.id]);
+  useEffect(() => { const next = initialDraft(item, defaultCategoryId, defaultDueDate); setDraft(next); draftRef.current = next; savedDraftRef.current = next; setItemId(item?.id ?? null); itemIdRef.current = item?.id ?? null; setError(null); }, [item?.id]);
   useEffect(() => { let active = true; const loadTemplates = async () => { if (typeof api.listFollowUpTemplates !== 'function') return; try { const next = await api.listFollowUpTemplates(); if (active) setTemplates(next); } catch { if (active) setTemplateError('模板服务暂不可用'); } }; void loadTemplates(); return () => { active = false; }; }, []);
 
   const changeDraft = (next: ItemInput) => { draftRef.current = next; setDraft(next); setError(null); };

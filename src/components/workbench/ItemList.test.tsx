@@ -17,6 +17,26 @@ afterEach(cleanup);
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.updateItem).mockImplementation(async (_id, input) => saved(input)); });
 
 describe('V2.2 可折叠事项卡', () => {
+  it('定位事项会滚动标记并展开目标卡片，不触发选择', () => {
+    const next = props();
+    render(<ItemList {...next} revealItemId="one" />);
+    expect(screen.getByRole('button', { name: '收起事项' })).toBeTruthy();
+    expect(screen.getByRole('article', { name: '事项：联系客户' }).classList.contains('is-revealed')).toBe(true);
+    expect(next.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('同一事项重复定位仍可再次展开，未知事项不会报错', () => {
+    const next = props();
+    const view = render(<ItemList {...next} revealItemId="one" />);
+    fireEvent.click(screen.getByRole('button', { name: '收起事项' }));
+    view.rerender(<ItemList {...next} revealItemId={null} />);
+    view.rerender(<ItemList {...next} revealItemId="one" />);
+    expect(screen.getByRole('button', { name: '收起事项' })).toBeTruthy();
+    cleanup();
+    expect(() => render(<ItemList {...next} revealItemId="missing" />)).not.toThrow();
+    expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
+  });
+
   it('默认收起仍显示标题栏、类别日期、完整最新进度、状态和详情入口', () => {
     const next = props();
     render(<ItemList {...next} />);

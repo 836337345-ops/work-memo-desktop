@@ -1,6 +1,7 @@
 .item-list .item-row { display: block; border: 0; margin: 8px 0; }
 .item-list .item-card { min-width: 0; border: 1px solid #dfeae3; border-radius: 12px; padding: 12px; color: #29463d; background: #fff; box-shadow: 0 2px 7px rgb(31 76 57 / 4%); }
 .item-list .item-row.selected .item-card { border-color: #8bc9ac; box-shadow: 0 0 0 3px rgb(97 178 139 / 13%); }
+.item-list .item-row .item-card.is-revealed { border-color: #4eaa81; box-shadow: 0 0 0 4px rgb(78 170 129 / 18%), 0 5px 14px rgb(31 76 57 / 10%); }
 .item-list .item-card__header { display: flex; min-width: 0; align-items: center; gap: 8px; border-bottom: 1px solid #e5eee8; padding-bottom: 8px; }
 .item-list .item-card__expand { width: 22px; height: 22px; flex: none; border: 1px solid #cfe1d6; border-radius: 6px; color: #2b785c; background: #f7fbf8; line-height: 18px; }
 .item-list .item-card__header .item-copy { min-width: 0; flex: 1; gap: 2px; }.item-list .item-card__header .item-copy strong { overflow: hidden; color: #244138; font-size: 17px; font-weight: 750; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }.item-list .item-card__header .item-copy small { overflow: hidden; color: #7d8e85; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }

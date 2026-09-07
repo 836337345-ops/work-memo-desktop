@@ -14,6 +14,7 @@ interface ItemListProps {
   onError?: (message: string) => void;
   onRestore?: (item: WorkItem) => void;
   editingItemId?: string | null;
+  revealItemId?: string | null;
 }
 
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
@@ -22,9 +23,10 @@ const errorText = (reason: unknown) => reason instanceof Error ? reason.message 
 
 interface CardHandle { prepareLeave: () => Promise<boolean> }
 
-function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister }: {
+function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister, onElementRegister, revealed = false, revealVersion = 0 }: {
   item: WorkItem; categoryName: string; selected: boolean; readOnly: boolean; onSelect: () => void;
   onChanged?: (item: WorkItem) => void; onError?: (message: string) => void; onRestore?: () => void; onRegister: (handle: CardHandle | null) => void;
+  onElementRegister: (element: HTMLElement | null) => void; revealed?: boolean; revealVersion?: number;
 }) {
   const [draft, setDraft] = useState<ItemInput>(() => toInput(item));
   const [progress, setProgress] = useState(item.progress);
@@ -45,6 +47,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const progressFailedRef = useRef(false);
 
   useEffect(() => { progressTextRef.current = progressText; }, [progressText]);
+  useEffect(() => { if (revealVersion > 0) setExpanded(true); }, [revealVersion]);
   // 自身保存的回传不应覆盖仍在输入的草稿；详情编辑器等外部更新则需要刷新卡片。
   useEffect(() => {
     if (item.id === ownItemIdRef.current && item.updatedAt === ownUpdateAtRef.current) return;
@@ -147,7 +150,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   useEffect(() => { onRegister({ prepareLeave }); return () => onRegister(null); }, [onRegister, prepareLeave]);
 
   return <li className={selected ? 'item-row selected' : 'item-row'}>
-    <article className="item-card" aria-label={`事项：${item.title}`}>
+    <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}>{expanded ? '⌃' : '⌄'}</button><span className={`status-dot ${draft.status}`} aria-hidden="true" />
         <div className="item-copy"><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong><small>{categoryName} · {formatChineseDate(item.dueDate)}</small></div>
@@ -163,8 +166,11 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   </li>;
 }
 
-export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore, editingItemId = null }, ref) {
+export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore, editingItemId = null, revealItemId = null }, ref) {
   const cardHandlesRef = useRef(new Map<string, CardHandle>());
+  const cardElementsRef = useRef(new Map<string, HTMLElement>());
+  const revealVersionRef = useRef(0);
+  const [revealRequest, setRevealRequest] = useState<{ id: string; version: number } | null>(null);
   const registerCard = useCallback((id: string, handle: CardHandle | null) => {
     if (handle) cardHandlesRef.current.set(id, handle);
     else cardHandlesRef.current.delete(id);
@@ -173,9 +179,27 @@ export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemL
     const results = await Promise.all([...cardHandlesRef.current.values()].map((handle) => handle.prepareLeave()));
     return results.every(Boolean);
   } }), []);
+  const registerCardElement = useCallback((id: string, element: HTMLElement | null) => {
+    if (element) cardElementsRef.current.set(id, element);
+    else cardElementsRef.current.delete(id);
+  }, []);
+  useEffect(() => {
+    if (!revealItemId) {
+      setRevealRequest(null);
+      return;
+    }
+    if (!items.some((item) => item.id === revealItemId)) {
+      setRevealRequest(null);
+      return;
+    }
+    const version = ++revealVersionRef.current;
+    setRevealRequest({ id: revealItemId, version });
+    const target = cardElementsRef.current.get(revealItemId);
+    target?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  }, [items, revealItemId]);
   const categoryName = (id: string | null) => categories.find((category) => category.id === id)?.name ?? '未分类';
   if (!items.length) return <div className="empty-state"><span>☷</span><h2>这里还没有事项</h2><p>{onRestore ? '回收站为空。删除的事项会暂存在这里。' : '新建一条事项，开始安排接下来的工作。'}</p></div>;
   return <ul className="item-list" aria-label="事项列表">
-    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore) || item.id === editingItemId} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} onRegister={(handle) => registerCard(item.id, handle)} />)}
+    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore) || item.id === editingItemId} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} onRegister={(handle) => registerCard(item.id, handle)} onElementRegister={(element) => registerCardElement(item.id, element)} revealed={revealRequest?.id === item.id} revealVersion={revealRequest?.id === item.id ? revealRequest.version : 0} />)}
   </ul>;
 });

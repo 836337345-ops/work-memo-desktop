@@ -37,6 +37,15 @@ describe('V2.3 ItemEditor', () => {
     await waitFor(() => expect(api.createItem).toHaveBeenCalled()); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
   });
 
+  it('新建草稿预填默认截止日期，已有事项始终使用自身日期', () => {
+    render(<ItemEditor {...props} item={null} defaultDueDate="2026-09-07" />);
+    expect((screen.getByLabelText('截止日期') as HTMLInputElement).value).toBe('2026-09-07');
+    cleanup();
+    const existing = savedItem({ ...base, dueDate: '2025-01-02' });
+    render(<ItemEditor {...props} item={existing} defaultDueDate="2030-12-31" />);
+    expect((screen.getByLabelText('截止日期') as HTMLInputElement).value).toBe('2025-01-02');
+  });
+
   it('只显示约定的编辑字段，隐藏状态和进度记录，但保存时保留既有状态', async () => {
     vi.mocked(api.updateItem).mockImplementation(async (_id, input) => savedItem(input));
     render(<ItemEditor {...props} />);
