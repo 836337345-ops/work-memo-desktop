@@ -30,6 +30,14 @@ describe('V2.2 可折叠事项卡', () => {
     expect(screen.queryByText('确认本周合作方案')).toBeNull();
   });
 
+  it('最新进度正文保留原有换行', () => {
+    const next = props();
+    const item = { ...base, progress: [{ ...base.progress[0], content: '第一行\n第二行' }] };
+    const { container } = render(<ItemList {...next} items={[item]} />);
+    const progress = container.querySelector('.item-card__progress-full') as HTMLElement;
+    expect(progress.textContent).toBe('第一行\n第二行');
+  });
+
   it('展开后显示情况、跟进和只读备注，标题类别日期仍不可编辑', () => {
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
