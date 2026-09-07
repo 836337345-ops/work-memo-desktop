@@ -49,12 +49,12 @@ export function matchesDateFilter(item: WorkItem, filter: DateFilter, today = fo
       return dueDate !== null && dueDate.slice(0, 7) === formatLocalDate(nextMonth).slice(0, 7);
     }
     case 'history': return dueDate !== null && dueDate < today;
-    case 'overdue': return dueDate !== null && dueDate < today && (item.status === 'todo' || item.status === 'doing');
+    case 'overdue': return dueDate !== null && dueDate < today && item.status === 'doing';
   }
 }
 
 export function isOverdue(item: WorkItem, today = formatLocalDate(new Date())) {
-  return item.dueDate !== null && item.dueDate < today && (item.status === 'todo' || item.status === 'doing');
+  return item.dueDate !== null && item.dueDate < today && item.status === 'doing';
 }
 
 export function searchItems(items: WorkItem[], query = '') {

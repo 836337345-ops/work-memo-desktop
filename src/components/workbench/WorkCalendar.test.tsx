@@ -57,14 +57,13 @@ describe('WorkCalendar', () => {
     expect(directTitles()).toEqual(['活动事项', '推广事项', '未分类事项']);
   });
 
-  it('为四种事项状态渲染对应的日历标记 class', () => {
+  it('为三种事项状态渲染对应的日历标记 class', () => {
     const { container } = render(<WorkCalendar items={[
-      makeItem({ id: 'todo', status: 'todo' }),
+      makeItem({ id: 'doing-2', status: 'doing' }),
       makeItem({ id: 'doing', status: 'doing' }),
       makeItem({ id: 'paused', status: 'paused' }),
       makeItem({ id: 'done', status: 'done' }),
     ]} onClose={vi.fn()} />);
-    expect(container.querySelector('.work-calendar__item-status--todo')).toBeTruthy();
     expect(container.querySelector('.work-calendar__item-status--doing')).toBeTruthy();
     expect(container.querySelector('.work-calendar__item-status--paused')).toBeTruthy();
     expect(container.querySelector('.work-calendar__item-status--done')).toBeTruthy();

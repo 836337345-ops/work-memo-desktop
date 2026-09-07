@@ -162,7 +162,7 @@ fn valid_input(v: &Input) -> R<Input> {
     text(&v.title, "事项标题", 200, true)?;
     text(&v.content, "事项内容", 20000, false)?;
     text(&v.notes, "备注", 20000, false)?;
-    if !matches!(v.status.as_str(), "todo" | "doing" | "done" | "paused") {
+    if !matches!(v.status.as_str(), "doing" | "done" | "paused") {
         return Err(fail("事项状态无效。"));
     }
     if let Some(d) = &v.due_date {
@@ -243,6 +243,8 @@ impl Store {
  CREATE TABLE IF NOT EXISTS progress_entries(id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,content TEXT NOT NULL,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS follow_up_templates(id TEXT PRIMARY KEY,category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,name TEXT NOT NULL,items_json TEXT NOT NULL,sort_order INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(category_id,name));
  CREATE INDEX IF NOT EXISTS idx_items_due ON items(due_date); CREATE INDEX IF NOT EXISTS idx_progress ON progress_entries(item_id,created_at DESC);").map_err(|_|fail("无法初始化本地数据库。"))?;
+        c.execute("DELETE FROM items WHERE status='todo'", [])
+            .map_err(|_| fail("无法清理已取消的待开展测试事项。"))?;
         let done: Option<String> = c
             .query_row("SELECT v FROM meta WHERE k='defaults'", [], |r| r.get(0))
             .optional()
@@ -682,6 +684,9 @@ impl Store {
             .map_err(|_| fail("备份中的模板无法写入。"))?;
         }
         for x in &b.items {
+            if x.input.status == "todo" {
+                continue;
+            }
             tx.execute(
                 "INSERT INTO items VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
                 params![
@@ -780,7 +785,13 @@ fn validate_backup(b: &Backup) -> R<()> {
         if !all.insert(&x.id) {
             return Err(fail("备份中的标识重复。"));
         };
-        valid_input(&x.input)?;
+        if x.input.status == "todo" {
+            let mut current_input = x.input.clone();
+            current_input.status = "doing".into();
+            valid_input(&current_input)?;
+        } else {
+            valid_input(&x.input)?;
+        }
         if let Some(id) = &x.input.category_id {
             if !ci.contains(id) {
                 return Err(fail("备份中的事项引用了不存在的分类。"));
@@ -869,28 +880,27 @@ fn read(path: &Path) -> R<Backup> {
         return Err(fail("请选择存在的备份文件。"));
     };
     let s = fs::read_to_string(path).map_err(|_| fail("无法读取备份文件。"))?;
-    let b = serde_json::from_str::<Backup>(&s)
+    let mut b = serde_json::from_str::<Backup>(&s)
         .map_err(|_| fail("备份文件不是有效的工作备忘录备份。"))?;
     validate_backup(&b)?;
+    b.items.retain(|item| item.input.status != "todo");
     Ok(b)
 }
 fn valid_export_input(st: &Store, input: &WorkItemsExportInput) -> R<()> {
     for status in &input.statuses {
-        if !matches!(status.as_str(), "todo" | "doing" | "done" | "paused") {
+        if !matches!(status.as_str(), "doing" | "done" | "paused") {
             return Err(fail("导出状态筛选无效。"));
         }
     }
     for filter in &input.date_filters {
         if !matches!(
             filter.as_str(),
-            "all"
-                | "today"
+            "today"
                 | "thisWeek"
                 | "nextWeek"
                 | "thisMonth"
                 | "nextMonth"
                 | "history"
-                | "overdue"
         ) {
             return Err(fail("导出时间筛选无效。"));
         }
@@ -918,7 +928,6 @@ fn following_month(date: NaiveDate) -> NaiveDate {
 fn matches_date_filter(
     filter: &str,
     due: Option<NaiveDate>,
-    status: &str,
     today: NaiveDate,
 ) -> bool {
     let Some(due) = due else { return false };
@@ -936,21 +945,18 @@ fn matches_date_filter(
             due >= next_month && due < after_next
         }
         "history" => due < today,
-        "overdue" => due < today && matches!(status, "todo" | "doing"),
         _ => false,
     }
 }
 fn matches_export_dates(
     filters: &[String],
     due: Option<NaiveDate>,
-    status: &str,
     today: NaiveDate,
 ) -> bool {
     filters.is_empty()
-        || filters.iter().any(|filter| filter == "all")
         || filters
             .iter()
-            .any(|filter| matches_date_filter(filter, due, status, today))
+            .any(|filter| matches_date_filter(filter, due, today))
 }
 fn export_date(date: Option<&String>) -> String {
     date.and_then(|v| NaiveDate::parse_from_str(v, "%Y-%m-%d").ok())
@@ -1031,7 +1037,6 @@ fn export_txt_at(
                     .due_date
                     .as_ref()
                     .and_then(|value| NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()),
-                &item.input.status,
                 today,
             )
         })
@@ -1288,7 +1293,7 @@ mod tests {
             content: "".into(),
             category_id: None,
             due_date: Some("2026-09-10".into()),
-            status: "todo".into(),
+            status: "doing".into(),
             notes: "".into(),
             follow_ups: vec![FollowUp {
                 id: "f1".into(),
@@ -1322,6 +1327,56 @@ mod tests {
         let x = s.detail(&a.id).unwrap();
         assert_eq!(x.input.title, "B");
         assert_eq!(x.progress.len(), 1);
+    }
+
+    #[test]
+    fn opening_existing_database_removes_only_legacy_todo_and_its_children() {
+        let d = tempdir().unwrap();
+        let p = d.path().join("legacy.db");
+        let mut s = Store::open(p.clone()).unwrap();
+        let keep = s.create(input()).unwrap();
+        s.progress_add(&keep.id, "保留进度").unwrap();
+        let now = stamp();
+        s.c.execute(
+            "INSERT INTO items VALUES(?1,?2,?3,NULL,NULL,'todo','',?4,?4,NULL)",
+            params!["legacy-todo", "待清理", "测试内容", now],
+        )
+        .unwrap();
+        s.c.execute(
+            "INSERT INTO follow_ups VALUES('legacy-follow','legacy-todo','待清理跟进',0,0)",
+            [],
+        )
+        .unwrap();
+        s.c.execute(
+            "INSERT INTO progress_entries VALUES('legacy-progress','legacy-todo','待清理进度',?1)",
+            [&now],
+        )
+        .unwrap();
+        drop(s);
+
+        let s = Store::open(p).unwrap();
+        let items = s.items().unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, keep.id);
+        assert_eq!(items[0].input.follow_ups.len(), 1);
+        assert_eq!(items[0].progress[0].content, "保留进度");
+        let removed_follow: i64 = s
+            .c
+            .query_row(
+                "SELECT COUNT(*) FROM follow_ups WHERE item_id='legacy-todo'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let removed_progress: i64 = s
+            .c
+            .query_row(
+                "SELECT COUNT(*) FROM progress_entries WHERE item_id='legacy-todo'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!((removed_follow, removed_progress), (0, 0));
     }
 
     #[test]
@@ -1406,6 +1461,46 @@ mod tests {
     }
 
     #[test]
+    fn legacy_backup_todo_items_are_validated_then_discarded() {
+        let d = tempdir().unwrap();
+        let mut s = Store::open(d.path().join("x.db")).unwrap();
+        let keep = s.create(input()).unwrap();
+        let mut legacy = s.backup().unwrap();
+        let mut todo = keep.clone();
+        todo.id = "legacy-todo-item".into();
+        todo.input.title = "旧待开展事项".into();
+        todo.input.status = "todo".into();
+        todo.input.follow_ups[0].id = "legacy-todo-follow".into();
+        todo.progress = vec![Progress {
+            id: "legacy-todo-progress".into(),
+            content: "旧进度".into(),
+            created_at: stamp(),
+        }];
+        legacy.items.push(todo);
+
+        s.restore(&legacy).unwrap();
+        let restored = s.items().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].id, keep.id);
+
+        let path = d.path().join("legacy.json");
+        write(&path, &legacy).unwrap();
+        let sanitized = read(&path).unwrap();
+        assert_eq!(sanitized.items.len(), 1);
+        assert_eq!(info(&sanitized).item_count, 1);
+        assert!(sanitized.items.iter().all(|item| item.input.status != "todo"));
+    }
+
+    #[test]
+    fn new_writes_reject_legacy_todo_status() {
+        let d = tempdir().unwrap();
+        let mut s = Store::open(d.path().join("x.db")).unwrap();
+        let mut legacy = input();
+        legacy.status = "todo".into();
+        assert_eq!(s.create(legacy).err().as_deref(), Some("事项状态无效。"));
+    }
+
+    #[test]
     fn damaged_template_backup_is_rejected_without_changing_data() {
         let d = tempdir().unwrap();
         let mut s = Store::open(d.path().join("x.db")).unwrap();
@@ -1485,79 +1580,48 @@ mod export_tests {
     #[test]
     fn date_filters_cover_local_calendar_boundaries() {
         let today = day("2026-09-06"); // Sunday; this week begins on Monday, August 31.
-        assert!(matches_date_filter("today", Some(today), "done", today));
+        assert!(matches_date_filter("today", Some(today), today));
         assert!(matches_date_filter(
             "thisWeek",
             Some(day("2026-08-31")),
-            "done",
             today
         ));
         assert!(!matches_date_filter(
             "thisWeek",
             Some(day("2026-09-07")),
-            "done",
             today
         ));
         assert!(matches_date_filter(
             "nextWeek",
             Some(day("2026-09-07")),
-            "done",
             today
         ));
         assert!(!matches_date_filter(
             "nextWeek",
             Some(day("2026-09-14")),
-            "done",
             today
         ));
         assert!(matches_date_filter(
             "thisMonth",
             Some(day("2026-09-30")),
-            "done",
             today
         ));
         assert!(matches_date_filter(
             "nextMonth",
             Some(day("2026-10-01")),
-            "done",
             today
         ));
         assert!(!matches_date_filter(
             "nextMonth",
             Some(day("2026-11-01")),
-            "done",
             today
         ));
         assert!(matches_date_filter(
             "history",
             Some(day("2026-09-05")),
-            "paused",
             today
         ));
-        assert!(matches_date_filter(
-            "overdue",
-            Some(day("2026-09-05")),
-            "todo",
-            today
-        ));
-        assert!(matches_date_filter(
-            "overdue",
-            Some(day("2026-09-05")),
-            "doing",
-            today
-        ));
-        assert!(!matches_date_filter(
-            "overdue",
-            Some(day("2026-09-05")),
-            "done",
-            today
-        ));
-        assert!(matches_export_dates(
-            &["all".into(), "overdue".into()],
-            None,
-            "done",
-            today
-        ));
+        assert!(matches_export_dates(&[], None, today));
     }
 
     #[test]
@@ -1582,7 +1646,7 @@ mod export_tests {
                 "推广早",
                 Some(promotion.clone()),
                 Some("2026-09-02"),
-                "todo",
+                "doing",
             ))
             .unwrap();
         store.progress_add(&first.id, "已沟通").unwrap();
@@ -1601,7 +1665,7 @@ mod export_tests {
             .create(item("未分类事项", None, None, "paused"))
             .unwrap();
         let deleted = store
-            .create(item("不应导出", None, Some("2026-09-03"), "todo"))
+            .create(item("不应导出", None, Some("2026-09-03"), "doing"))
             .unwrap();
         store.trash(&deleted.id, true).unwrap();
         let output = dir.path().join("items.txt");
@@ -1624,6 +1688,14 @@ mod export_tests {
         let mut invalid_status = export_input(output.clone());
         invalid_status.statuses.push("unknown".into());
         assert!(export_txt_at(&store, &invalid_status, day("2026-09-06")).is_err());
+        let mut legacy_status = export_input(output.clone());
+        legacy_status.statuses.push("todo".into());
+        assert!(export_txt_at(&store, &legacy_status, day("2026-09-06")).is_err());
+        for removed_filter in ["all", "overdue"] {
+            let mut invalid_date = export_input(output.clone());
+            invalid_date.date_filters.push(removed_filter.into());
+            assert!(export_txt_at(&store, &invalid_date, day("2026-09-06")).is_err());
+        }
         let mut missing_category = export_input(output);
         missing_category.category_ids.push(Some("gone".into()));
         assert!(export_txt_at(&store, &missing_category, day("2026-09-06")).is_err());

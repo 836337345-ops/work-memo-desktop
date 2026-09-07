@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { filterItems, isOverdue, matchesDateFilter, sortByDueDate } from './filters';
 import type { WorkItem } from '../types';
 
-const item = (dueDate: string | null, status: WorkItem['status'] = 'todo', createdAt = '2026-01-01T00:00:00Z'): WorkItem => ({
+const item = (dueDate: string | null, status: WorkItem['status'] = 'doing', createdAt = '2026-01-01T00:00:00Z'): WorkItem => ({
   id: dueDate ?? 'none', title: '测试', content: '', categoryId: null, dueDate, status, notes: '', followUps: [], progress: [], createdAt, updatedAt: createdAt, deletedAt: null,
 });
 
@@ -21,7 +21,7 @@ describe('日期筛选', () => {
   });
 
   it('空日期排在最后，同日期按创建时间倒序', () => {
-    const sorted = sortByDueDate([item(null), item('2026-09-14', 'todo', '2026-01-01T00:00:00Z'), item('2026-09-14', 'todo', '2026-02-01T00:00:00Z'), item('2026-09-13')]);
+    const sorted = sortByDueDate([item(null), item('2026-09-14', 'doing', '2026-01-01T00:00:00Z'), item('2026-09-14', 'doing', '2026-02-01T00:00:00Z'), item('2026-09-13')]);
     expect(sorted.map((entry) => entry.dueDate)).toEqual(['2026-09-13', '2026-09-14', '2026-09-14', null]);
     expect(sorted[1].createdAt).toBe('2026-02-01T00:00:00Z');
   });
@@ -29,13 +29,12 @@ describe('日期筛选', () => {
   it('历史包含所有状态的已过截止日期事项，关键词仍可叠加', () => {
     const finished = item('2026-09-12', 'done'); finished.title = '已归档方案';
     const paused = item('2026-09-11', 'paused'); paused.title = '已暂停活动';
-    const today = item('2026-09-13', 'todo'); today.title = '今天事项';
+    const today = item('2026-09-13', 'doing'); today.title = '今天事项';
     expect(filterItems([finished, paused, today], { dateFilter: 'history', query: '方案', today: '2026-09-13' })).toEqual([finished]);
     expect(matchesDateFilter(paused, 'history', '2026-09-13')).toBe(true);
   });
 
-  it('仅待开展和进行中的过期事项显示为逾期', () => {
-    expect(isOverdue(item('2026-09-12', 'todo'), '2026-09-13')).toBe(true);
+  it('仅进行中的过期事项显示为逾期', () => {
     expect(isOverdue(item('2026-09-12', 'doing'), '2026-09-13')).toBe(true);
     expect(isOverdue(item('2026-09-12', 'done'), '2026-09-13')).toBe(false);
     expect(isOverdue(item('2026-09-12', 'paused'), '2026-09-13')).toBe(false);

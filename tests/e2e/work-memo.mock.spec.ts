@@ -28,8 +28,8 @@ const seed: BrowserState = {
     { id: 'item-current', title: '样板间开放推广', content: '协调海报、渠道物料与到访动线。', categoryId: 'cat-promotion', dueDate: '2026-09-07', status: 'doing', notes: '优先核对到访动线。', followUps: [{ id: 'follow-1', text: '确认渠道海报尺寸', done: false }, { id: 'follow-2', text: '核验活动物料', done: false }, { id: 'follow-3', text: '同步销售排班', done: false }, { id: 'follow-4', text: '复核接待动线', done: false }], progress: [{ id: 'progress-1', content: '已收集三家渠道的物料清单。\n下一步安排周五现场复核。', createdAt: '2026-09-06T09:00:00.000Z' }], createdAt: '2026-09-06T09:00:00.000Z', updatedAt: '2026-09-06T09:00:00.000Z', deletedAt: null },
     { id: 'item-done-history', title: '已完成活动复盘', content: '整理活动到访数据。', categoryId: 'cat-event', dueDate: '2026-09-01', status: 'done', notes: '归档完成。', followUps: [], progress: [{ id: 'progress-2', content: '复盘已发出。', createdAt: '2026-09-02T09:00:00.000Z' }], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
     { id: 'item-paused-history', title: '暂停包装更新', content: '等待新包装规范。', categoryId: 'cat-package', dueDate: '2026-09-02', status: 'paused', notes: '暂缓执行。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-02T09:00:00.000Z', deletedAt: null },
-    { id: 'item-overdue', title: '逾期渠道物料', content: '补齐渠道物料清单。', categoryId: 'cat-promotion', dueDate: '2026-09-04', status: 'todo', notes: '等待供应商报价。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
-    { id: 'item-no-date', title: '无截止日期的草稿', content: '不应出现在日历。', categoryId: null, dueDate: null, status: 'todo', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+    { id: 'item-overdue', title: '逾期渠道物料', content: '补齐渠道物料清单。', categoryId: 'cat-promotion', dueDate: '2026-09-04', status: 'doing', notes: '等待供应商报价。', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
+    { id: 'item-no-date', title: '无截止日期的草稿', content: '不应出现在日历。', categoryId: null, dueDate: null, status: 'doing', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: null },
     { id: 'item-trashed-calendar', title: '已删除的历史事项', content: '不应出现在日历。', categoryId: 'cat-event', dueDate: '2026-09-03', status: 'done', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T09:00:00.000Z', updatedAt: '2026-09-04T09:00:00.000Z', deletedAt: '2026-09-04T09:00:00.000Z' },
   ],
   templates: [
@@ -440,7 +440,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(page.getByRole('heading', { name: '全部事项' })).toBeVisible();
   });
 
-  test('V2.4 日历不受列表条件影响，显示四种状态颜色和可聚焦的完整当日标题', async ({ page }) => {
+  test('V2.4 日历不受列表条件影响，显示三种状态颜色和可聚焦的完整当日标题', async ({ page }) => {
     await page.getByRole('button', { name: /^时间/ }).click();
     await page.getByRole('button', { name: /^分类/ }).click();
     await page.getByRole('button', { name: '已完成', exact: true }).click();
@@ -454,7 +454,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(calendar.getByText('无截止日期的草稿', { exact: true })).toHaveCount(0);
     await expect(calendar.getByText('已删除的历史事项', { exact: true })).toHaveCount(0);
     const markerColors = await calendar.locator('.work-calendar__item-status').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
-    expect(markerColors).toEqual(expect.arrayContaining(['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)', 'rgb(154, 167, 161)']));
+    expect(markerColors).toEqual(expect.arrayContaining(['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)']));
     const day = calendar.getByRole('button', { name: /2026-09-07，1条事项/ });
     const popover = day.locator('xpath=../..').getByRole('tooltip');
     await day.hover();
@@ -525,7 +525,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
         { ...seed.items[0], progress: [{ ...seed.items[0].progress[0], content: longProgress }] },
         { ...seed.items[1], id: 'calendar-event', title: '活动事项', dueDate: '2026-09-07', status: 'done', deletedAt: null },
         { ...seed.items[2], id: 'calendar-package', title: '包装事项', dueDate: '2026-09-07', status: 'paused', deletedAt: null },
-        { ...seed.items[3], id: 'calendar-none', title: '未分类事项', categoryId: null, dueDate: '2026-09-07', status: 'todo', deletedAt: null },
+        { ...seed.items[3], id: 'calendar-none', title: '未分类事项', categoryId: null, dueDate: '2026-09-07', status: 'doing', deletedAt: null },
         { ...seed.items[3], id: 'calendar-extra', title: '第五项事项', categoryId: 'cat-expansion-1', dueDate: '2026-09-07', status: 'doing', deletedAt: null },
         ...seed.items.filter((item) => !['item-current', 'item-done-history', 'item-paused-history', 'item-overdue'].includes(String(item.id))),
       ],
@@ -638,7 +638,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
       ...seed,
       items: [
         { ...seed.items[0], id: 'calendar-target', title: '日历定位目标', categoryId: 'cat-event', dueDate: calendarDate, status: 'doing', deletedAt: null },
-        { ...seed.items[1], id: 'calendar-todo', title: '待开展日历事项', dueDate: calendarDate, status: 'todo', deletedAt: null },
+        { ...seed.items[1], id: 'calendar-doing-extra', title: '另一项进行中工作', dueDate: calendarDate, status: 'doing', deletedAt: null },
         { ...seed.items[2], id: 'calendar-paused', title: '暂停日历事项', dueDate: calendarDate, status: 'paused', deletedAt: null },
         { ...seed.items[3], id: 'calendar-done', title: '完成日历事项', dueDate: calendarDate, status: 'done', deletedAt: null },
       ],
@@ -658,11 +658,10 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     const calendar = page.locator('.work-calendar');
     await expect(calendar.getByRole('tooltip')).toHaveCount(42);
     const currentDay = calendar.locator(`[data-date="${calendarDate}"]`);
-    await expect(currentDay.locator('.work-calendar__title')).toHaveText(['日历定位目标', '待开展日历事项', '暂停日历事项']);
+    await expect(currentDay.locator('.work-calendar__title')).toHaveText(['日历定位目标', '另一项进行中工作', '暂停日历事项']);
     await expect(currentDay.getByText('另有 1 项', { exact: true })).toBeVisible();
     await expect(currentDay.locator('.work-calendar__status')).toHaveCount(0);
-    await expect(currentDay.locator('.work-calendar__item-status--todo')).toHaveCount(2);
-    await expect(currentDay.locator('.work-calendar__item-status--doing')).toHaveCount(2);
+    await expect(currentDay.locator('.work-calendar__item-status--doing')).toHaveCount(4);
     await expect(currentDay.locator('.work-calendar__item-status--paused')).toHaveCount(2);
     await expect(currentDay.locator('.work-calendar__item-status--done')).toHaveCount(1);
     await expect(currentDay.locator('.work-calendar__item-status').first()).toHaveCSS('animation-name', 'work-calendar-breathe');
