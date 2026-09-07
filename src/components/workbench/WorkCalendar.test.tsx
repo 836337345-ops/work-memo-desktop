@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkCalendar } from './WorkCalendar';
+import { holidaysForYear } from './calendar';
 import type { WorkItem } from '../../types';
 
 const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({ id: 'item-1', title: '今天事项', content: '', categoryId: null, dueDate: '2026-09-07', status: 'doing', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, ...overrides });
@@ -14,7 +15,7 @@ describe('WorkCalendar', () => {
     render(<WorkCalendar items={[makeItem(), makeItem({ id: 'trash', title: '回收站事项', deletedAt: '2026-09-02T00:00:00Z' }), makeItem({ id: 'no-date', title: '无日期事项', dueDate: null })]} onClose={vi.fn()} />);
     expect(screen.getByRole('heading', { name: '2026年9月' })).toBeTruthy();
     expect(screen.getAllByRole('gridcell')).toHaveLength(42);
-    expect(screen.getByText('今天事项')).toBeTruthy();
+    expect(document.querySelector('.work-calendar__title')?.textContent).toBe('今天事项');
     expect(screen.queryByText('回收站事项')).toBeNull();
     expect(screen.queryByText('无日期事项')).toBeNull();
     expect(screen.getByTitle('进行中')).toBeTruthy();
@@ -25,7 +26,34 @@ describe('WorkCalendar', () => {
     const dayButton = screen.getByRole('button', { name: /2026-09-07/ });
     fireEvent.focus(dayButton);
     expect(screen.getByRole('tooltip')).toBeTruthy();
-    expect(screen.getByText('第二项')).toBeTruthy();
+    expect(screen.getByRole('tooltip').textContent).toContain('第二项');
+  });
+
+  it('日期格最多直显三条标题，更多事项显示汇总', () => {
+    const { container } = render(<WorkCalendar items={[
+      makeItem({ id: 'one', title: '第一项' }),
+      makeItem({ id: 'two', title: '第二项' }),
+      makeItem({ id: 'three', title: '第三项' }),
+      makeItem({ id: 'four', title: '第四项' }),
+    ]} onClose={vi.fn()} />);
+    expect(Array.from(container.querySelectorAll('.work-calendar__title')).map((node) => node.textContent)).toEqual(['第一项', '第二项', '第三项']);
+    expect(screen.getByText('另有 1 项')).toBeTruthy();
+  });
+
+  it('分类多选只影响当前日历，清空选择恢复全部', () => {
+    const { container } = render(<WorkCalendar categories={[{ id: 'a', name: '活动', sortOrder: 0 }, { id: 'b', name: '推广', sortOrder: 1 }]} items={[
+      makeItem({ id: 'a-item', title: '活动事项', categoryId: 'a' }),
+      makeItem({ id: 'b-item', title: '推广事项', categoryId: 'b' }),
+      makeItem({ id: 'none-item', title: '未分类事项', categoryId: null }),
+    ]} onClose={vi.fn()} />);
+    const directTitles = () => Array.from(container.querySelectorAll('.work-calendar__title')).map((node) => node.textContent);
+    expect(directTitles()).toEqual(['活动事项', '推广事项', '未分类事项']);
+    fireEvent.click(screen.getByRole('checkbox', { name: '活动' }));
+    expect(directTitles()).toEqual(['活动事项']);
+    fireEvent.click(screen.getByRole('checkbox', { name: '未分类' }));
+    expect(directTitles()).toEqual(['活动事项', '未分类事项']);
+    fireEvent.click(screen.getByRole('button', { name: '全部' }));
+    expect(directTitles()).toEqual(['活动事项', '推广事项', '未分类事项']);
   });
 
   it('为四种事项状态渲染对应的日历标记 class', () => {
@@ -50,5 +78,27 @@ describe('WorkCalendar', () => {
     expect(screen.getByRole('heading', { name: '2026年9月' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '关闭日历' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('计算跨年份节日并标红周末与节日日期', () => {
+    const holidays2026 = holidaysForYear(2026);
+    const holidays2027 = holidaysForYear(2027);
+    expect(holidays2026.get('2026-01-01')).toBe('元旦');
+    expect(holidays2026.get('2026-02-17')).toBe('春节');
+    expect(holidays2026.get('2026-06-19')).toBe('端午');
+    expect(holidays2026.get('2026-09-25')).toBe('中秋');
+    expect(holidays2027.get('2027-02-07')).toBe('春节');
+    const { container } = render(<WorkCalendar items={[]} onClose={vi.fn()} />);
+    expect(container.querySelector('[data-date="2026-09-06"]')?.className).toContain('work-calendar__day--red-date');
+    expect(container.querySelector('[data-date="2026-09-25"]')?.className).toContain('work-calendar__day--red-date');
+    expect(screen.getByText('中秋')).toBeTruthy();
+  });
+
+  it('六周网格会显示相邻年份的节日简称', () => {
+    const { container } = render(<WorkCalendar items={[]} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '下月' }));
+    fireEvent.click(screen.getByRole('button', { name: '下月' }));
+    fireEvent.click(screen.getByRole('button', { name: '下月' }));
+    expect(container.querySelector('[data-date="2027-01-01"] .work-calendar__festival')?.textContent).toBe('元旦');
   });
 });

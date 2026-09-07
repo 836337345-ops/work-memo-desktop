@@ -7,6 +7,12 @@
 .work-calendar__actions button:hover { background: #e5f3e9; }
 .work-calendar__actions .work-calendar__close { color: #fff; border-color: #2c8365; background: #2c8365; }
 .work-calendar__actions .work-calendar__close:hover { background: #216d53; }
+.work-calendar__categories { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; margin: 0 0 13px; border: 1px solid #dce8df; border-radius: 8px; padding: 7px 10px; color: #49665a; background: #f7fbf8; font-size: 12px; }
+.work-calendar__categories legend { margin-right: 2px; padding: 0 3px; color: #526e63; font-weight: 800; }
+.work-calendar__categories label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.work-calendar__categories input { margin: 0; accent-color: #2c8365; }
+.work-calendar__category-all { border: 1px solid transparent; border-radius: 5px; padding: 3px 7px; color: #527067; background: transparent; font-size: 12px; font-weight: 700; }
+.work-calendar__category-all:hover, .work-calendar__category-all.is-selected { color: #166047; background: #d7eee0; }
 .work-calendar__weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid #dce8df; border-bottom: 0; border-radius: 9px 9px 0 0; background: #edf5ef; }
 .work-calendar__weekday { padding: 8px 9px; color: #668075; font-size: 12px; font-weight: 800; text-align: right; }
 .work-calendar__grid { display: grid; min-width: 0; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: repeat(6, minmax(92px, 1fr)); border: 1px solid #dce8df; border-radius: 0 0 9px 9px; overflow: visible; }
@@ -16,8 +22,16 @@
 .work-calendar__day--outside { background: #f7faf7; }
 .work-calendar__day--outside .work-calendar__number { color: #a6b5ad; }
 .work-calendar__day--today { background: #f0faf3; box-shadow: inset 0 0 0 2px #86c4a1; }
-.work-calendar__number { display: block; width: 100%; border: 0; padding: 0; color: #315347; background: transparent; font-size: 13px; font-weight: 750; text-align: right; }
+.work-calendar__date-row { display: flex; align-items: center; justify-content: space-between; gap: 5px; min-width: 0; }
+.work-calendar__number { flex: none; border: 0; padding: 0; color: #315347; background: transparent; font-size: 14px; font-weight: 750; text-align: right; }
 .work-calendar__number:focus-visible { outline: 2px solid #318468; outline-offset: 2px; border-radius: 3px; }
+.work-calendar__festival { min-width: 0; overflow: hidden; color: #b44f4a; font-size: 11px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.work-calendar__day--red-date .work-calendar__number { color: #c7544d; }
+.work-calendar__day--outside .work-calendar__number { color: #a6b5ad; }
+.work-calendar__day--outside.work-calendar__day--red-date .work-calendar__number { color: #d18d88; }
+.work-calendar__titles { min-width: 0; margin-top: 6px; }
+.work-calendar__title, .work-calendar__more { overflow: hidden; color: #36574a; font-size: 11px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.work-calendar__more { color: #71877d; font-weight: 700; }
 .work-calendar__markers { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .work-calendar__status { display: inline-flex; align-items: center; gap: 3px; color: #5c756a; font-size: 11px; font-weight: 700; }
 .work-calendar__status::before { width: 7px; height: 7px; border-radius: 50%; background: #9aa7a1; content: ''; }
@@ -29,5 +43,5 @@
 .work-calendar__day:hover .work-calendar__popover, .work-calendar__day:focus-within .work-calendar__popover { opacity: 1; pointer-events: auto; transform: translateY(0); }
 .work-calendar__popover-title { margin: 0 0 5px; color: #6b8177; font-size: 11px; font-weight: 800; }
 .work-calendar__popover ul { margin: 0; padding-left: 16px; color: #36574a; font-size: 12px; line-height: 1.5; }
-@media (max-width: 1130px) { .work-calendar { padding: 18px 19px 22px; }.work-calendar__grid { grid-template-rows: repeat(6, minmax(82px, 1fr)); }.work-calendar__day { min-height: 82px; padding: 6px; }.work-calendar__markers { gap: 3px; margin-top: 6px; }.work-calendar__status { font-size: 10px; } }
+@media (max-width: 1130px) { .work-calendar { padding: 18px 19px 22px; }.work-calendar__header { align-items: flex-start; flex-direction: column; }.work-calendar__actions { width: 100%; flex-wrap: wrap; }.work-calendar__grid { grid-template-rows: repeat(6, minmax(82px, 1fr)); }.work-calendar__day { min-height: 82px; padding: 6px; }.work-calendar__markers { gap: 3px; margin-top: 6px; }.work-calendar__status { font-size: 10px; } }
 @media (prefers-reduced-motion: reduce) { .work-calendar__popover { transition: none; } }
