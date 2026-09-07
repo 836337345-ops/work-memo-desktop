@@ -632,7 +632,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
   test('V2.6 日历逐事项状态灯、返回定位和按日期新建计划均可用', async ({ page }) => {
     const calendarDate = '2026-09-07';
     const emptyDate = '2026-09-10';
-    const crossMonthDate = '2026-10-15';
+    const adjacentMonthDate = '2026-08-31';
     await mockIpc(page, {
       ...seed,
       items: [
@@ -655,6 +655,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
 
     await page.getByRole('button', { name: '工作日历' }).click();
     const calendar = page.locator('.work-calendar');
+    await expect(calendar.getByRole('tooltip')).toHaveCount(42);
     const currentDay = calendar.locator(`[data-date="${calendarDate}"]`);
     await expect(currentDay.locator('.work-calendar__title')).toHaveText(['日历定位目标', '待开展日历事项', '暂停日历事项']);
     await expect(currentDay.getByText('另有 1 项', { exact: true })).toBeVisible();
@@ -716,11 +717,15 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await createForDate(emptyDate, '空日期新建计划');
 
     await page.getByRole('button', { name: '工作日历' }).click();
-    await page.locator('.work-calendar').getByRole('button', { name: '下月' }).click();
-    const crossMonthDay = page.locator('.work-calendar').locator(`[data-date="${crossMonthDate}"]`);
-    await crossMonthDay.getByRole('button', { name: crossMonthDate }).focus();
-    await expect(crossMonthDay.getByRole('tooltip')).toContainText('当日暂无事项');
-    await crossMonthDay.getByRole('tooltip').getByRole('button', { name: '新增计划' }).click();
-    await createForDate(crossMonthDate, '跨月日期新建计划');
+    const adjacentMonthDay = page.locator('.work-calendar').locator(`[data-date="${adjacentMonthDate}"]`);
+    await expect(adjacentMonthDay).toHaveClass(/work-calendar__day--outside/);
+    await adjacentMonthDay.getByRole('button', { name: adjacentMonthDate }).focus();
+    await expect(adjacentMonthDay.getByRole('tooltip')).toContainText('当日暂无事项');
+    await adjacentMonthDay.getByRole('tooltip').getByRole('button', { name: '新增计划' }).click();
+    await createForDate(adjacentMonthDate, '相邻月份日期新建计划');
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await expect(page.locator('[data-date="2026-09-07"] .work-calendar__item-status').first()).toHaveCSS('animation-name', 'none');
   });
 });
