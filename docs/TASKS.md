@@ -5,11 +5,11 @@
 | 卡号 | 任务 | 分支 | 状态 |
 | --- | --- | --- | --- |
 | T70 | PM｜保存 V2.5 快照并冻结 V2.6 契约 | integration/v2 | 已完成 |
-| T71 | 开发员 C｜逐事项呼吸灯与日历浮窗按钮 | feat/calendar-actions-v26 | 待分发 |
-| T72 | 开发员 B｜事项卡定位展开与新建日期预填 | feat/calendar-target-v26 | 待分发 |
-| T73 | PM｜连接日历跳转与新建流程 | integration/v2 | 待集成 |
-| T74 | 独立测试员｜V2.6 验收 | qa/v2.6 | 待集成后分发 |
-| T75 | PM｜启动隔离调试版并交用户确认 | integration/v2 | 待开始 |
+| T71 | 开发员 C｜逐事项呼吸灯与日历浮窗按钮 | feat/calendar-actions-v26 | 已完成并集成（824314c、e80f25c） |
+| T72 | 开发员 B｜事项卡定位展开与新建日期预填 | feat/calendar-target-v26 | 已完成并集成（fb9dca3、afe6df2） |
+| T73 | PM｜连接日历跳转与新建流程 | integration/v2 | 已完成（7c5fe92） |
+| T74 | 独立测试员｜V2.6 验收 | qa/v2.6 | 已通过并集成（62 项测试、19 项 Edge 界面流程） |
+| T75 | PM｜启动隔离调试版并交用户确认 | integration/v2 | 后端与启动验证通过，隔离调试版已启动，待用户目测确认 |
 
 ## V2.5 日历信息增强任务看板
 
