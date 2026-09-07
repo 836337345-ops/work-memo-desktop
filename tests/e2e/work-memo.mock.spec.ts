@@ -877,3 +877,119 @@ test.describe('工作备忘录 V2.7 视觉验收', () => {
     await expect(calendar.locator('.work-calendar__item-status').first()).toHaveCSS('animation-name', 'none');
   });
 });
+
+test.describe('工作备忘录 V2.8 独立验收', () => {
+  test.skip(!uiReady, '仅在明确设置 QA_UI_READY=1 时执行 V2.8 UI / IPC 验收。');
+
+  test.beforeEach(async ({ page }) => {
+    await mockIpc(page);
+    await page.goto('/');
+  });
+
+  test('启动默认只显示进行中工作，左栏无待开展并可一键恢复进行中', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: '进行中', exact: true })).toBeVisible();
+    await expect(page.getByRole('article', { name: '事项：样板间开放推广' })).toBeVisible();
+    await expect(page.getByRole('article', { name: '事项：已完成活动复盘' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '待开展', exact: true })).toHaveCount(0);
+
+    const statusGroup = page.getByRole('button', { name: /^状态/ });
+    await statusGroup.click();
+    await expect(statusGroup).toHaveText('状态 · 进行中⌄');
+    await expect(page.getByRole('button', { name: /^时间/ })).toHaveText('时间 · 全部时间⌄');
+    await expect(page.getByRole('button', { name: /^分类/ })).toHaveText('分类 · 全部分类⌄');
+
+    await page.getByRole('button', { name: '显示全部', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '全部事项', exact: true })).toBeVisible();
+    await page.getByLabel('搜索事项').fill('不会保留的关键词');
+    await page.getByRole('button', { name: '显示进行中工作', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '进行中', exact: true })).toBeVisible();
+    await expect(page.getByLabel('搜索事项')).toHaveValue('');
+  });
+
+  test('新建默认进行中，跟进清单首行与模板入口符合约定', async ({ page }) => {
+    await page.getByRole('button', { name: '＋ 新建事项', exact: true }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    await expect(editor.getByRole('button', { name: '删除事项', exact: true })).toHaveCount(0);
+    await editor.getByLabel('所属类别').selectOption('cat-event');
+
+    const add = editor.getByRole('button', { name: '添加清单', exact: true });
+    const templates = editor.getByRole('button', { name: '模板设定/应用', exact: true });
+    const [addBox, templateBox] = await Promise.all([add.boundingBox(), templates.boundingBox()]);
+    expect(addBox && templateBox && Math.abs(addBox.y - templateBox.y)).toBeLessThan(3);
+    expect(addBox && templateBox && addBox.x).toBeLessThan(templateBox?.x ?? 0);
+    for (const button of [add, templates]) {
+      const isBlue = await button.evaluate((node) => {
+        const channels = getComputedStyle(node).color.match(/\d+/g)?.map(Number) ?? [];
+        return channels.length >= 3 && channels[2] > channels[1] && channels[1] > channels[0];
+      });
+      expect(isBlue).toBe(true);
+    }
+    await expect(editor.getByRole('button', { name: '＋ 新建模板', exact: true })).toHaveCount(0);
+    await templates.click();
+    await expect(editor.getByRole('button', { name: '＋ 新建模板', exact: true })).toBeVisible();
+
+    await editor.getByLabel(/事项标题/).fill('V2.8 默认状态验收事项');
+    await editor.getByRole('button', { name: '创建并关闭', exact: true }).click();
+    const payload = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').at(-1).payload.input);
+    expect(payload.status).toBe('doing');
+  });
+
+  test('编辑已有事项时删除按钮与保存并关闭固定在顶部，底部无重复入口', async ({ page }) => {
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await card.getByRole('button', { name: '修改编辑', exact: true }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    const topbar = editor.locator('.item-editor__topbar');
+    await expect(topbar.getByRole('button', { name: '删除事项', exact: true })).toBeVisible();
+    await expect(topbar.getByRole('button', { name: '保存并关闭', exact: true })).toBeVisible();
+    await expect(editor.getByRole('button', { name: '移入回收站', exact: true })).toHaveCount(0);
+    const topBefore = await topbar.evaluate((node) => node.getBoundingClientRect().top);
+    await editor.locator('.item-editor__scroll').evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    expect(await topbar.evaluate((node) => node.getBoundingClientRect().top)).toBe(topBefore);
+  });
+
+  test('事项卡副标题字号提升，添加跟进与标题同行', async ({ page }) => {
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await expect(card.locator('small').first()).toHaveCSS('font-size', '14px');
+    await card.getByRole('button', { name: '展开事项' }).click();
+    const heading = card.getByText('跟进清单', { exact: true });
+    const addFollowUp = card.getByRole('button', { name: /添加跟进/ });
+    const [headingBox, buttonBox] = await Promise.all([heading.boundingBox(), addFollowUp.boundingBox()]);
+    expect(headingBox && buttonBox && Math.abs(headingBox.y - buttonBox.y)).toBeLessThan(4);
+    const countBefore = await card.getByLabel('跟进内容').count();
+    await addFollowUp.click();
+    await expect(card.getByLabel('跟进内容')).toHaveCount(countBefore + 1);
+  });
+
+  test('导出三组支持全选反选，六个时间项与不限日期语义正确', async ({ page }) => {
+    await page.getByRole('button', { name: '导出事项', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    const status = dialog.getByRole('group', { name: '状态' });
+    const time = dialog.getByRole('group', { name: '时间' });
+    const category = dialog.getByRole('group', { name: '分类' });
+
+    await expect(status.getByRole('checkbox')).toHaveCount(3);
+    await expect(time.getByRole('checkbox')).toHaveCount(6);
+    await expect(time.getByText(/^(今天|本周|下周|本月|下月|历史)$/)).toHaveCount(6);
+    await expect(time.getByText('全部时间', { exact: true })).toHaveCount(0);
+    await expect(time.getByText('已逾期', { exact: true })).toHaveCount(0);
+    await expect(category.getByRole('checkbox')).toHaveCount(seed.categories.length + 1);
+    for (const label of ['状态全选', '状态反选', '时间全选', '时间反选', '分类全选', '分类反选']) {
+      await expect(dialog.getByRole('button', { name: label, exact: true })).toBeVisible();
+    }
+
+    await dialog.getByRole('button', { name: '选择位置并导出 TXT', exact: true }).click();
+    let payload = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'export_work_items').at(-1).payload.input);
+    expect(payload).toMatchObject({ statuses: [], dateFilters: [], categoryIds: [] });
+
+    await dialog.getByRole('button', { name: '时间反选', exact: true }).click();
+    await dialog.getByRole('button', { name: '选择位置并导出 TXT', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('每组至少选择一项');
+    const callsAfterBlockedExport = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'export_work_items').length);
+    expect(callsAfterBlockedExport).toBe(1);
+
+    await time.getByLabel('今天').check();
+    await dialog.getByRole('button', { name: '选择位置并导出 TXT', exact: true }).click();
+    payload = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'export_work_items').at(-1).payload.input);
+    expect(payload.dateFilters).toEqual(['today']);
+  });
+});
