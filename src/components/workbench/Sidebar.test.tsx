@@ -42,7 +42,11 @@ describe('V2 工作台导航', () => {
 
   it('提供工作日历入口', () => {
     const props = setup();
-    fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
+    const calendar = screen.getByRole('button', { name: '工作日历' });
+    const showAll = screen.getByRole('button', { name: '显示全部' });
+    expect(calendar.compareDocumentPosition(showAll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(calendar.closest('.sidebar-bottom')).toBeNull();
+    fireEvent.click(calendar);
     expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
   });
 });

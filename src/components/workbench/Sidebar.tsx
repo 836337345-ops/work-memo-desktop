@@ -52,6 +52,7 @@ export function Sidebar({ categories, filters, trash, calendar, onDateFilter, on
   const summary = { status: filters.status === 'all' ? '全部' : STATUS_LABELS[filters.status], time: dateLinks.find((link) => link.value === filters.date)?.label ?? '全部时间', category: categoryLabel };
   return <aside className="sidebar" aria-label="事项导航">
     <div className="brand"><span className="brand-mark">✓</span><span>工作备忘录</span></div>
+    <button className={calendar ? 'sidebar-calendar active' : 'sidebar-calendar'} onClick={onOpenCalendar}>工作日历</button>
     <button className="sidebar-show-all" onClick={onShowAll}>显示全部</button>
     <nav>
       <section className={`sidebar-group sidebar-group-${expanded.status ? 'open' : 'closed'}`}>
@@ -67,6 +68,6 @@ export function Sidebar({ categories, filters, trash, calendar, onDateFilter, on
         {expanded.category && <div id="category-filter-group" className="sidebar-group-options"><button className={!trash && filters.categoryId === undefined ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(undefined)}>全部分类</button><button className={!trash && filters.categoryId === null ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(null)}>未分类</button>{categories.map((category) => <button key={category.id} className={!trash && filters.categoryId === category.id ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(category.id)}>{category.name}</button>)}</div>}
       </section>
     </nav>
-    <div className="sidebar-bottom"><button className={calendar ? 'nav-link active' : 'nav-link'} onClick={onOpenCalendar}>工作日历</button><button className={trash ? 'nav-link active' : 'nav-link'} onClick={onTrash}>回收站</button><button className="nav-link" onClick={onOpenBackup}>备份与恢复</button><button className="nav-link" onClick={onOpenExport}>导出事项</button></div>
+    <div className="sidebar-bottom"><button className={trash ? 'nav-link active' : 'nav-link'} onClick={onTrash}>回收站</button><button className="nav-link" onClick={onOpenBackup}>备份与恢复</button><button className="nav-link" onClick={onOpenExport}>导出事项</button></div>
   </aside>;
 }
