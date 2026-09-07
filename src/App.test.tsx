@@ -14,6 +14,18 @@ beforeEach(() => {
 });
 
 describe('App 工作日历入口', () => {
+  it('启动默认显示进行中工作，快捷入口会清除搜索并恢复该筛选', async () => {
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: '进行中' })).toBeTruthy();
+    const search = screen.getByPlaceholderText('搜索标题、内容、进度、跟进或备注') as HTMLInputElement;
+    fireEvent.change(search, { target: { value: '临时关键词' } });
+    fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: '显示进行中工作' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
+    expect(search.value).toBe('');
+  });
+
   it('点击工作日历后切换只读月历并隐藏编辑栏', async () => {
     render(<App />);
     const entry = await screen.findByRole('button', { name: '工作日历' });

@@ -1,0 +1,5 @@
+.export-panel .export-options { position: relative; display: block; padding-top: 13px; }
+.export-panel .export-selection-actions { position: absolute; top: -12px; right: 8px; display: flex; align-items: center; gap: 3px; padding: 0 3px; background: #fbfcfb; }
+.export-panel .export-selection-actions button { min-height: 24px; border: 0; border-radius: var(--radius-sm); padding: 2px 7px; color: var(--primary); background: transparent; font-size: 12px; font-weight: 650; }
+.export-panel .export-selection-actions button:hover { color: var(--primary-hover); background: var(--secondary); }
+.export-panel .export-option-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
