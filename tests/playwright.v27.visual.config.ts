@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  grep: /V2\.7 视觉验收/,
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,

@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 // contract suite imports mockIPC itself; this page-level bridge is required
 // because Playwright's browser context cannot import Node modules directly.
 const uiReady = process.env.QA_UI_READY === '1';
+const v27VisualReady = process.env.QA_V27_VISUAL === '1';
 
 type BrowserState = {
   items: Array<Record<string, unknown>>;
@@ -727,5 +728,153 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.getByRole('button', { name: '工作日历' }).click();
     await expect(page.locator('[data-date="2026-09-07"] .work-calendar__item-status').first()).toHaveCSS('animation-name', 'none');
+  });
+});
+
+test.describe('工作备忘录 V2.7 视觉验收', () => {
+  test.skip(!v27VisualReady, '仅在明确设置 QA_V27_VISUAL=1 时执行 V2.7 视觉验收。');
+
+  test.beforeEach(async ({ page }) => {
+    const longText = '这是用于独立验收的超长中文内容，用来确认事项标题、最新进度、事项情况与备注在不同窗口尺寸下都不会越界、遮挡或变得无法访问。'.repeat(3);
+    await mockIpc(page, {
+      ...seed,
+      items: [{
+        ...seed.items[0],
+        title: `中文长标题：${longText}`,
+        content: `事项情况：${longText}`,
+        notes: `备注：${longText}`,
+        progress: [{ id: 'progress-long', content: `最新进度：${longText}\n第二行仍需完整展示。`, createdAt: '2026-09-06T09:00:00.000Z' }],
+      }, ...seed.items.slice(1)],
+    });
+    await page.goto('/');
+  });
+
+  test('语义令牌、浅绿色主色、独立日历入口和键盘焦点一致', async ({ page }) => {
+    const theme = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      const card = document.querySelector('.item-card') as HTMLElement;
+      return {
+        primary: root.getPropertyValue('--primary').trim(),
+        background: root.getPropertyValue('--background').trim(),
+        foreground: root.getPropertyValue('--foreground').trim(),
+        cardToken: root.getPropertyValue('--card').trim(),
+        popover: root.getPropertyValue('--popover').trim(),
+        border: root.getPropertyValue('--border').trim(),
+        input: root.getPropertyValue('--input').trim(),
+        ring: root.getPropertyValue('--ring').trim(),
+        radius: root.getPropertyValue('--radius-md').trim(),
+        cardBackground: getComputedStyle(card).backgroundColor,
+      };
+    });
+    expect(theme).toMatchObject({ primary: '#327b61', background: '#f4f7f5', foreground: '#17231f', cardToken: '#fff', popover: '#fff' });
+    for (const key of ['border', 'input', 'ring', 'radius'] as const) expect(theme[key]).not.toBe('');
+    expect(theme.cardBackground).toBe('rgb(255, 255, 255)');
+
+    const calendar = page.getByRole('button', { name: '工作日历' });
+    const showAll = page.getByRole('button', { name: '显示全部', exact: true });
+    const [calendarBox, showAllBox] = await Promise.all([calendar.boundingBox(), showAll.boundingBox()]);
+    expect(calendarBox && showAllBox && calendarBox.y).toBeLessThan(showAllBox?.y ?? 0);
+    expect(Math.abs((calendarBox?.width ?? 0) - (showAllBox?.width ?? 0))).toBeLessThan(1);
+
+    const newItem = page.getByRole('button', { name: '＋ 新建事项', exact: true });
+    await newItem.focus();
+    const focus = await newItem.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth), color: style.outlineColor };
+    });
+    expect(focus.style).toBe('solid');
+    expect(focus.width).toBeGreaterThanOrEqual(2);
+    expect(focus.color).not.toBe('rgba(0, 0, 0, 0)');
+  });
+
+  test('长中文内容、三栏和右侧单滚动区在双尺寸下均可访问', async ({ page }) => {
+    const card = page.getByRole('article', { name: /事项：中文长标题/ });
+    const progress = card.locator('.item-card__progress-full');
+    const progressLayout = await progress.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const parent = node.closest('.item-card')!.getBoundingClientRect();
+      const style = getComputedStyle(node);
+      return { inside: box.left >= parent.left && box.right <= parent.right + 1, wraps: node.scrollWidth <= node.clientWidth, whiteSpace: style.whiteSpace };
+    });
+    expect(progressLayout).toEqual({ inside: true, wraps: true, whiteSpace: 'pre-wrap' });
+
+    await card.getByRole('button', { name: '展开事项' }).click();
+    for (const selector of ['.item-card__situation', '.item-card__notes']) {
+      const layout = await card.locator(selector).evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        const parent = node.closest('.item-card')!.getBoundingClientRect();
+        return { inside: box.left >= parent.left && box.right <= parent.right + 1, horizontalOverflow: node.scrollWidth > node.clientWidth };
+      });
+      expect(layout).toEqual({ inside: true, horizontalOverflow: false });
+    }
+
+    await card.getByRole('button', { name: '修改编辑' }).click();
+    const editor = page.getByRole('region', { name: '事项编辑器' });
+    await expect(editor.getByRole('textbox', { name: '事项标题', exact: true })).toHaveValue(/中文长标题/);
+    const shell = await page.locator('.app-shell').evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const editorPane = node.querySelector('.editor-pane') as HTMLElement;
+      const scroll = node.querySelector('.item-editor__scroll') as HTMLElement;
+      return {
+        insideViewport: box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1,
+        columns: getComputedStyle(node).gridTemplateColumns.split(' ').length,
+        editorOverflow: getComputedStyle(editorPane).overflowY,
+        scrollOverflow: getComputedStyle(scroll).overflowY,
+        scrollable: scroll.scrollHeight > scroll.clientHeight,
+      };
+    });
+    expect(shell.insideViewport).toBe(true);
+    expect(shell.columns).toBe(3);
+    expect(shell.editorOverflow).toBe('hidden');
+    expect(shell.scrollOverflow).toBe('auto');
+    expect(shell.scrollable).toBe(true);
+    const reachedBottom = await editor.locator('.item-editor__scroll').evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+      return node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
+    });
+    expect(reachedBottom).toBe(true);
+  });
+
+  test('日历与分类、备份、导出弹层无遮挡，并支持小高度和减少动画', async ({ page }) => {
+    const assertDialogInViewport = async () => {
+      const dialog = page.getByRole('dialog');
+      await expect(dialog).toBeVisible();
+      const layout = await dialog.locator('.modal-card').evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        node.scrollTop = node.scrollHeight;
+        return {
+          inside: box.left >= 0 && box.right <= innerWidth + 1 && box.top >= 0 && box.bottom <= innerHeight + 1,
+          bottomReachable: node.scrollTop + node.clientHeight >= node.scrollHeight - 1,
+        };
+      });
+      expect(layout).toEqual({ inside: true, bottomReachable: true });
+      await dialog.getByRole('button', { name: '关闭' }).click();
+    };
+
+    await page.getByRole('button', { name: '管理分类' }).click();
+    await assertDialogInViewport();
+    await page.getByRole('button', { name: '备份与恢复' }).click();
+    await assertDialogInViewport();
+    await page.getByRole('button', { name: '导出事项' }).click();
+    await assertDialogInViewport();
+
+    await page.setViewportSize({ width: 1060, height: 576 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const calendar = page.locator('.work-calendar');
+    await expect(calendar).toBeVisible();
+    const layout = await calendar.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      node.scrollTop = node.scrollHeight;
+      return {
+        insideWidth: box.left >= 0 && box.right <= innerWidth + 1,
+        overflowY: getComputedStyle(node).overflowY,
+        bottomReachable: node.scrollTop + node.clientHeight >= node.scrollHeight - 1,
+      };
+    });
+    expect(layout.insideWidth).toBe(true);
+    expect(layout.overflowY).toBe('auto');
+    expect(layout.bottomReachable).toBe(true);
+    await expect(calendar.locator('.work-calendar__item-status').first()).toHaveCSS('animation-name', 'none');
   });
 });
