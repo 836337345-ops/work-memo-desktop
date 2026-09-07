@@ -449,19 +449,19 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(page.locator('.item-card')).toHaveCount(0);
     await page.getByRole('button', { name: '工作日历' }).click();
     const calendar = page.locator('.work-calendar');
-    for (const title of ['样板间开放推广', '已完成活动复盘', '暂停包装更新', '逾期渠道物料']) await expect(calendar.getByText(title, { exact: true })).toBeAttached();
+    for (const title of ['样板间开放推广', '已完成活动复盘', '暂停包装更新', '逾期渠道物料']) await expect(calendar.locator('.work-calendar__title').filter({ hasText: title })).toHaveCount(1);
     await expect(calendar.getByText('无截止日期的草稿', { exact: true })).toHaveCount(0);
     await expect(calendar.getByText('已删除的历史事项', { exact: true })).toHaveCount(0);
     const markerColors = await calendar.locator('.work-calendar__status').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node, '::before').backgroundColor));
     expect(markerColors).toEqual(expect.arrayContaining(['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)', 'rgb(154, 167, 161)']));
     const day = calendar.getByRole('button', { name: /2026-09-07，1条事项/ });
-    const popover = day.locator('xpath=..').getByRole('tooltip');
+    const popover = day.locator('xpath=../..').getByRole('tooltip');
     await day.hover();
     await expect(popover).toHaveCSS('opacity', '1');
     await day.focus();
     await expect(popover).toHaveCSS('opacity', '1');
     await expect(popover).toContainText('样板间开放推广');
-    await expect(calendar.locator('input, textarea, select')).toHaveCount(0);
+    await expect(calendar.locator('.work-calendar__grid input, .work-calendar__grid textarea, .work-calendar__grid select')).toHaveCount(0);
   });
 
   test('V2.4 1060×700 日历可滚到底部，返回列表、筛选和回收站均正常', async ({ page }) => {
@@ -514,5 +514,118 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     expect(['visible', 'hidden']).toContain(layout.paneOverflow);
     expect(layout.paneScrollable).toBe(false);
     expect(layout.documentOverflow).toBe('hidden');
+  });
+
+  test('V2.5 日历多分类、节日和进度排版满足只读验收', async ({ page }) => {
+    const longProgress = '第一行保留原有换行，且这是一段足够长的虚构进度内容，用于确认正文能够自然换行而不会被截断。\n第二行继续保留，提交新进度后原有的展示与交互仍应可用。';
+    await mockIpc(page, {
+      ...seed,
+      items: [
+        { ...seed.items[0], progress: [{ ...seed.items[0].progress[0], content: longProgress }] },
+        { ...seed.items[1], id: 'calendar-event', title: '活动事项', dueDate: '2026-09-07', status: 'done', deletedAt: null },
+        { ...seed.items[2], id: 'calendar-package', title: '包装事项', dueDate: '2026-09-07', status: 'paused', deletedAt: null },
+        { ...seed.items[3], id: 'calendar-none', title: '未分类事项', categoryId: null, dueDate: '2026-09-07', status: 'todo', deletedAt: null },
+        { ...seed.items[3], id: 'calendar-extra', title: '第五项事项', categoryId: 'cat-expansion-1', dueDate: '2026-09-07', status: 'doing', deletedAt: null },
+        ...seed.items.filter((item) => !['item-current', 'item-done-history', 'item-paused-history', 'item-overdue'].includes(String(item.id))),
+      ],
+    });
+    await page.reload();
+
+    await page.getByRole('button', { name: /^分类/ }).click();
+    await page.getByRole('button', { name: '包装', exact: true }).click();
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const calendar = page.locator('.work-calendar');
+    const septemberSeventh = calendar.locator('[data-date="2026-09-07"]');
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveCount(3);
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveText(['样板间开放推广', '活动事项', '包装事项']);
+    await expect(septemberSeventh.getByText('另有 2 项', { exact: true })).toBeVisible();
+    const day = septemberSeventh.getByRole('button', { name: '2026-09-07，5条事项' });
+    await day.hover();
+    await expect(septemberSeventh.getByRole('tooltip')).toContainText('第五项事项');
+    await day.focus();
+    await expect(septemberSeventh.getByRole('tooltip')).toContainText('未分类事项');
+
+    await expect(calendar.getByRole('button', { name: '全部', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await calendar.getByRole('checkbox', { name: '活动' }).check();
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveText(['活动事项']);
+    await calendar.getByRole('checkbox', { name: '未分类' }).check();
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveText(['活动事项', '未分类事项']);
+    await calendar.getByRole('checkbox', { name: '活动' }).uncheck();
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveText(['未分类事项']);
+    await calendar.getByRole('checkbox', { name: '未分类' }).uncheck();
+    await expect(septemberSeventh.locator('.work-calendar__title')).toHaveCount(3);
+    await expect(calendar.getByRole('button', { name: '全部', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await calendar.getByRole('button', { name: '关闭日历' }).click();
+    await expect(page.locator('.sidebar .nav-link.active').allTextContents()).resolves.toEqual(expect.arrayContaining(['包装']));
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await expect(calendar.getByRole('button', { name: '全部', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(calendar.getByRole('checkbox', { name: '活动' })).not.toBeChecked();
+
+    const calendarStyles = await calendar.evaluate((node) => {
+      const number = node.querySelector('[data-date="2026-09-06"] .work-calendar__number') as HTMLElement;
+      const sunday = node.querySelector('[data-date="2026-09-06"]') as HTMLElement;
+      const holiday = node.querySelector('[data-date="2026-09-25"]') as HTMLElement;
+      return {
+        numberSize: Number.parseFloat(getComputedStyle(number).fontSize),
+        sundayRed: getComputedStyle(number).color,
+        sundayClass: sunday.className,
+        holidayClass: holiday.className,
+      };
+    });
+    expect(calendarStyles.numberSize).toBeGreaterThanOrEqual(14);
+    expect(calendarStyles.sundayRed).toBe('rgb(199, 84, 77)');
+    expect(calendarStyles.sundayClass).toContain('work-calendar__day--red-date');
+    expect(calendarStyles.holidayClass).toContain('work-calendar__day--red-date');
+
+    for (let index = 0; index < 8; index += 1) await calendar.getByRole('button', { name: '上月' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年1月' })).toBeVisible();
+    const newYear = calendar.locator('[data-date="2026-01-01"]');
+    await expect(newYear.locator('.work-calendar__festival')).toHaveText('元旦');
+    const sameRow = await newYear.evaluate((node) => {
+      const dateRow = node.querySelector('.work-calendar__date-row') as HTMLElement;
+      const number = node.querySelector('.work-calendar__number') as HTMLElement;
+      const festival = node.querySelector('.work-calendar__festival') as HTMLElement;
+      const numberBox = number.getBoundingClientRect();
+      const festivalBox = festival.getBoundingClientRect();
+      return { rowDisplay: getComputedStyle(dateRow).display, sameTop: Math.abs(numberBox.top - festivalBox.top) < 3 };
+    });
+    expect(sameRow).toEqual({ rowDisplay: 'flex', sameTop: true });
+    for (let index = 0; index < 11; index += 1) await calendar.getByRole('button', { name: '下月' }).click();
+    await expect(calendar.getByRole('heading', { name: '2026年12月' })).toBeVisible();
+    await expect(calendar.locator('[data-date="2027-01-01"] .work-calendar__festival')).toHaveText('元旦');
+    await expect(calendar.getByRole('gridcell')).toHaveCount(42);
+
+    await calendar.getByRole('button', { name: '关闭日历' }).click();
+    await page.getByRole('button', { name: '显示全部', exact: true }).click();
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await expect(card.locator('.item-card__progress-full')).toHaveText(longProgress);
+    const progressLayout = await card.locator('.item-card__progress').evaluate((node) => {
+      const label = node.querySelector('b') as HTMLElement;
+      const content = node.querySelector('.item-card__progress-full') as HTMLElement;
+      return {
+        display: getComputedStyle(node).display,
+        labelTop: label.getBoundingClientRect().top,
+        contentTop: content.getBoundingClientRect().top,
+        whiteSpace: getComputedStyle(content).whiteSpace,
+        wrapsWithoutOverflow: content.scrollWidth <= content.clientWidth,
+      };
+    });
+    expect(progressLayout.display).toBe('grid');
+    expect(Math.abs(progressLayout.labelTop - progressLayout.contentTop)).toBeLessThan(3);
+    expect(progressLayout.whiteSpace).toBe('pre-wrap');
+    expect(progressLayout.wrapsWithoutOverflow).toBe(true);
+    await card.locator('.item-card__progress-full').click();
+    await card.getByLabel('新增进度').fill('V2.5 虚构提交进度');
+    await card.getByRole('button', { name: '提交新进度' }).click();
+    await expect(card.getByLabel('新增进度')).toHaveCount(0);
+    await expect(card.locator('.item-card__progress-full')).toHaveText('V2.5 虚构提交进度');
+  });
+
+  test('V2.5 虚构备份恢复会先校验并提示安全备份路径', async ({ page }) => {
+    await page.getByRole('button', { name: '备份与恢复' }).click();
+    await page.getByRole('button', { name: '选择备份并恢复' }).click();
+    await expect(page.getByRole('status')).toContainText('恢复完成，共恢复 1 条事项。恢复前的数据已安全备份至：C:/qa-isolated/backup-before-restore.json');
+    const commands = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.map((call: any) => call.command));
+    expect(commands).toEqual(expect.arrayContaining(['inspect_backup', 'restore_backup', 'list_items', 'list_categories']));
   });
 });
