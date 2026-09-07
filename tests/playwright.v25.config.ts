@@ -5,8 +5,8 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'D:/qa-v25-playwright-report' }]],
-  outputDir: 'D:/qa-v25-test-results',
+  reporter: [['list'], ['html', { open: 'never', outputFolder: 'D:/qa-v25-playwright-report-final' }]],
+  outputDir: 'D:/qa-v25-test-results-final',
   use: {
     baseURL: 'http://127.0.0.1:4285',
     screenshot: 'only-on-failure',
