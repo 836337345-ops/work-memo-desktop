@@ -452,7 +452,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     for (const title of ['样板间开放推广', '已完成活动复盘', '暂停包装更新', '逾期渠道物料']) await expect(calendar.locator('.work-calendar__title').filter({ hasText: title })).toHaveCount(1);
     await expect(calendar.getByText('无截止日期的草稿', { exact: true })).toHaveCount(0);
     await expect(calendar.getByText('已删除的历史事项', { exact: true })).toHaveCount(0);
-    const markerColors = await calendar.locator('.work-calendar__status').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node, '::before').backgroundColor));
+    const markerColors = await calendar.locator('.work-calendar__item-status').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
     expect(markerColors).toEqual(expect.arrayContaining(['rgb(57, 169, 120)', 'rgb(228, 161, 62)', 'rgb(218, 102, 98)', 'rgb(154, 167, 161)']));
     const day = calendar.getByRole('button', { name: /2026-09-07，1条事项/ });
     const popover = day.locator('xpath=../..').getByRole('tooltip');
@@ -627,5 +627,100 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(page.getByRole('status')).toContainText('恢复完成，共恢复 1 条事项。恢复前的数据已安全备份至：C:/qa-isolated/backup-before-restore.json');
     const commands = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.map((call: any) => call.command));
     expect(commands).toEqual(expect.arrayContaining(['inspect_backup', 'restore_backup', 'list_items', 'list_categories']));
+  });
+
+  test('V2.6 日历逐事项状态灯、返回定位和按日期新建计划均可用', async ({ page }) => {
+    const calendarDate = '2026-09-07';
+    const emptyDate = '2026-09-10';
+    const crossMonthDate = '2026-10-15';
+    await mockIpc(page, {
+      ...seed,
+      items: [
+        { ...seed.items[0], id: 'calendar-target', title: '日历定位目标', categoryId: 'cat-event', dueDate: calendarDate, status: 'doing', deletedAt: null },
+        { ...seed.items[1], id: 'calendar-todo', title: '待开展日历事项', dueDate: calendarDate, status: 'todo', deletedAt: null },
+        { ...seed.items[2], id: 'calendar-paused', title: '暂停日历事项', dueDate: calendarDate, status: 'paused', deletedAt: null },
+        { ...seed.items[3], id: 'calendar-done', title: '完成日历事项', dueDate: calendarDate, status: 'done', deletedAt: null },
+      ],
+    });
+    await page.reload();
+
+    // 先设置会遮挡目标事项的四类工作台条件，确认日历返回会全部清除。
+    await page.getByRole('button', { name: /^时间/ }).click();
+    await page.getByRole('button', { name: /^分类/ }).click();
+    await page.getByRole('button', { name: '已暂停', exact: true }).click();
+    await page.getByRole('button', { name: '历史', exact: true }).click();
+    await page.getByRole('button', { name: '活动', exact: true }).click();
+    await page.getByLabel('搜索事项').fill('会遮挡定位目标的虚构关键词');
+    await expect(page.locator('.item-card')).toHaveCount(0);
+
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const calendar = page.locator('.work-calendar');
+    const currentDay = calendar.locator(`[data-date="${calendarDate}"]`);
+    await expect(currentDay.locator('.work-calendar__title')).toHaveText(['日历定位目标', '待开展日历事项', '暂停日历事项']);
+    await expect(currentDay.getByText('另有 1 项', { exact: true })).toBeVisible();
+    await expect(currentDay.locator('.work-calendar__status')).toHaveCount(0);
+    await expect(currentDay.locator('.work-calendar__item-status--todo')).toHaveCount(2);
+    await expect(currentDay.locator('.work-calendar__item-status--doing')).toHaveCount(2);
+    await expect(currentDay.locator('.work-calendar__item-status--paused')).toHaveCount(2);
+    await expect(currentDay.locator('.work-calendar__item-status--done')).toHaveCount(1);
+    await expect(currentDay.locator('.work-calendar__item-status').first()).toHaveCSS('animation-name', 'work-calendar-breathe');
+
+    await currentDay.getByRole('button', { name: `${calendarDate}，4条事项` }).focus();
+    const currentPopover = currentDay.getByRole('tooltip');
+    await expect(currentPopover.getByRole('button', { name: '完成日历事项' })).toBeVisible();
+    await currentPopover.getByRole('button', { name: '日历定位目标' }).click();
+    const targetCard = page.getByRole('article', { name: '事项：日历定位目标' });
+    await expect(targetCard).toHaveClass(/is-revealed/);
+    await expect(targetCard.getByRole('button', { name: '收起事项' })).toBeVisible();
+    await expect(page.getByRole('region', { name: '事项编辑器' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '全部事项', exact: true })).toBeVisible();
+    await expect(page.getByLabel('搜索事项')).toHaveValue('');
+    await expect(page.getByRole('button', { name: '全部状态', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: '全部时间', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: '全部分类', exact: true })).toHaveClass(/active/);
+
+    // 再次从同一浮窗打开同一事项，仍需重新定位并展开，且不能打开右侧编辑栏。
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const repeatedDay = page.locator('.work-calendar').locator(`[data-date="${calendarDate}"]`);
+    await repeatedDay.getByRole('button', { name: `${calendarDate}，4条事项` }).focus();
+    await repeatedDay.getByRole('tooltip').getByRole('button', { name: '日历定位目标' }).click();
+    await expect(page.getByRole('article', { name: '事项：日历定位目标' })).toHaveClass(/is-revealed/);
+    await expect(page.getByRole('button', { name: '收起事项' })).toBeVisible();
+    await expect(page.getByRole('region', { name: '事项编辑器' })).toHaveCount(0);
+
+    const createForDate = async (date: string, title: string) => {
+      const callsBefore = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').length);
+      const editor = page.getByRole('region', { name: '事项编辑器' });
+      await expect(editor.getByLabel('截止日期')).toHaveValue(date);
+      await editor.getByLabel(/事项标题/).fill(title);
+      await editor.getByRole('button', { name: '创建并关闭' }).click();
+      await expect(editor).toHaveCount(0);
+      const created = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').at(-1).payload.input);
+      expect(created.dueDate).toBe(date);
+      expect(created.title).toBe(title);
+      expect(await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').length)).toBe(callsBefore + 1);
+    };
+
+    // 有事项日期、空日期和跨月日期都从固定按钮进入，并把所点日期带入新建草稿。
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const ordinaryDay = page.locator('.work-calendar').locator(`[data-date="${calendarDate}"]`);
+    await ordinaryDay.getByRole('button', { name: `${calendarDate}，4条事项` }).focus();
+    await ordinaryDay.getByRole('tooltip').getByRole('button', { name: '新增计划' }).click();
+    await createForDate(calendarDate, '普通日期新建计划');
+
+    await page.getByRole('button', { name: '工作日历' }).click();
+    const emptyDay = page.locator('.work-calendar').locator(`[data-date="${emptyDate}"]`);
+    await emptyDay.getByRole('button', { name: emptyDate }).focus();
+    await expect(emptyDay.getByRole('tooltip')).toContainText('当日暂无事项');
+    await emptyDay.getByRole('tooltip').getByRole('button', { name: '新增计划' }).click();
+    await createForDate(emptyDate, '空日期新建计划');
+
+    await page.getByRole('button', { name: '工作日历' }).click();
+    await page.locator('.work-calendar').getByRole('button', { name: '下月' }).click();
+    const crossMonthDay = page.locator('.work-calendar').locator(`[data-date="${crossMonthDate}"]`);
+    await crossMonthDay.getByRole('button', { name: crossMonthDate }).focus();
+    await expect(crossMonthDay.getByRole('tooltip')).toContainText('当日暂无事项');
+    await crossMonthDay.getByRole('tooltip').getByRole('button', { name: '新增计划' }).click();
+    await createForDate(crossMonthDate, '跨月日期新建计划');
   });
 });
