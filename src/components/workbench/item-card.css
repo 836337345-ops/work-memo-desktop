@@ -1,16 +1,47 @@
 .item-list .item-row { display: block; border: 0; margin: 8px 0; }
-.item-list .item-card { min-width: 0; border: 1px solid #dfeae3; border-radius: 12px; padding: 12px; color: #29463d; background: #fff; box-shadow: 0 2px 7px rgb(31 76 57 / 4%); }
-.item-list .item-row.selected .item-card { border-color: #8bc9ac; box-shadow: 0 0 0 3px rgb(97 178 139 / 13%); }
-.item-list .item-row .item-card.is-revealed { border-color: #4eaa81; box-shadow: 0 0 0 4px rgb(78 170 129 / 18%), 0 5px 14px rgb(31 76 57 / 10%); }
-.item-list .item-card__header { display: flex; min-width: 0; align-items: center; gap: 8px; border-bottom: 1px solid #e5eee8; padding-bottom: 8px; }
-.item-list .item-card__expand { width: 22px; height: 22px; flex: none; border: 1px solid #cfe1d6; border-radius: 6px; color: #2b785c; background: #f7fbf8; line-height: 18px; }
-.item-list .item-card__header .item-copy { min-width: 0; flex: 1; gap: 2px; }.item-list .item-card__header .item-copy strong { overflow: hidden; color: #244138; font-size: 17px; font-weight: 750; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }.item-list .item-card__header .item-copy small { overflow: hidden; color: #7d8e85; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.item-list .item-card__status { width: 82px; flex: none; border: 1px solid #d4e0d7; border-radius: 7px; padding: 5px 6px; color: #365249; background: #fff; font-size: 12px; }
-.item-list .item-card__header .restore-button { flex: none; margin-left: auto; padding: 5px 0 5px 7px; color: #287155; white-space: nowrap; }
-.item-list .item-card__body { display: grid; min-width: 0; gap: 8px; padding-top: 8px; }.item-list .item-card__body > section, .item-list .item-card__body > p, .item-list .item-card__body > div { min-width: 0; margin: 0; }.item-list .item-card__body b { display: inline-block; margin-right: 6px; color: #698078; font-size: 14px; font-weight: 800; line-height: 1.3; letter-spacing: .02em; }
-.item-list .item-card__progress { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: baseline; border-radius: 7px; padding: 7px 8px; background: #f7faf8; cursor: pointer; }.item-list .item-card__progress:hover { background: #f1f8f4; }.item-list .item-card__progress > b { margin-right: 0; }.item-list .item-card__progress-full { display: block; min-width: 0; margin: 0; color: #526961; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }.item-list .item-card__progress > div { display: grid; grid-column: 1 / -1; gap: 7px; margin-top: 8px; cursor: default; }.item-list .item-card__progress textarea { width: 100%; min-width: 0; border: 1px solid #d4e0d7; border-radius: 7px; padding: 7px 8px; resize: vertical; font: inherit; font-size: 13px; }
-.item-list .item-card__situation { display: flex; min-width: 0; align-items: baseline; gap: 5px; border-radius: 7px; padding: 7px 8px; color: #526961; background: #f7faf8; font-size: 13px; line-height: 1.45; }.item-list .item-card__situation span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.item-list .item-card__body section[aria-label="跟进清单"] { border-radius: 7px; padding: 7px 8px; background: #f7faf8; }.item-list .item-card__body section[aria-label="跟进清单"] > ul { display: grid; gap: 5px; margin: 3px 0 6px; padding: 0; list-style: none; }.item-list .item-card__body section[aria-label="跟进清单"] li { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }.item-list .item-card__body section[aria-label="跟进清单"] li input[type=checkbox] { width: 15px; height: 15px; margin: 0; accent-color: #2c8365; }.item-list .item-card__body section[aria-label="跟进清单"] li input:not([type=checkbox]) { width: 100%; min-width: 0; border: 1px solid #d4e0d7; border-radius: 6px; padding: 5px 6px; font: inherit; font-size: 12px; }.item-list .item-card__body .icon-button { width: 23px; height: 23px; color: #a5554d; font-size: 17px; }.item-list .item-card__notes { min-width: 0; border-radius: 7px; padding: 7px 8px; color: #526961; background: #f7faf8; font-size: 13px; line-height: 1.45; }.item-list .item-card__notes span { overflow-wrap: anywhere; }
-.item-list .item-card .status-dot { animation: item-card-breathe 2.8s ease-in-out infinite; }.item-list .item-card .status-dot.todo { background: #9aa7a1; }.item-list .item-card .status-dot.doing { background: #39a978; }.item-list .item-card .status-dot.paused { background: #da6662; }.item-list .item-card .status-dot.done { background: #e4a13e; }
-@keyframes item-card-breathe { 0%, 100% { transform: scale(1); opacity: .88; } 50% { transform: scale(1.15); opacity: 1; } }
+.item-list .item-card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; color: var(--card-foreground); background: var(--card); box-shadow: var(--shadow-xs); }
+.item-list .item-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+.item-list .item-row.selected .item-card { border-color: #8fc2a8; box-shadow: 0 0 0 3px rgb(77 155 124 / 11%); }
+.item-list .item-row .item-card.is-revealed { border-color: var(--ring); box-shadow: 0 0 0 4px rgb(77 155 124 / 16%), var(--shadow-sm); }
+.item-list .item-card__header { display: flex; min-width: 0; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 9px; }
+.item-list .item-card__expand { display: grid; width: 23px; height: 23px; flex: none; place-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0; color: var(--primary); background: var(--card); font-size: 12px; line-height: 1; }
+.item-list .item-card__expand:hover { border-color: #a9c7b7; background: var(--secondary); }
+.item-list .item-card__header .item-copy { min-width: 0; flex: 1; gap: 2px; }
+.item-list .item-card__header .item-copy strong { overflow: hidden; color: var(--foreground); font-size: 16px; font-weight: 700; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.item-list .item-card__header .item-copy small { overflow: hidden; color: var(--muted-foreground); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.item-list .item-card__overdue { display: inline-block; margin-left: 6px; vertical-align: 2px; }
+.item-list .item-card__status { width: 82px; flex: none; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 5px 7px; color: #344c43; background: var(--card); font-size: 12px; box-shadow: var(--shadow-xs); }
+.item-list .item-card__status:hover:not(:disabled) { border-color: #a9c7b7; }
+.item-list .item-card__header .restore-button { flex: none; margin-left: 0; padding: 5px 6px; white-space: nowrap; }
+.item-list .item-card__body { display: grid; min-width: 0; gap: 7px; padding-top: 8px; }
+.item-list .item-card__body > section, .item-list .item-card__body > p, .item-list .item-card__body > div { min-width: 0; margin: 0; }
+.item-list .item-card__body b { display: inline-block; margin-right: 6px; color: #52675e; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.item-list .item-card__progress, .item-list .item-card__situation, .item-list .item-card__body section[aria-label="跟进清单"], .item-list .item-card__notes { border: 1px solid transparent; border-radius: var(--radius-md); padding: 8px 9px; background: var(--muted); }
+.item-list .item-card__progress { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 6px; align-items: baseline; cursor: pointer; }
+.item-list .item-card__progress:hover { border-color: var(--border); background: var(--secondary); }
+.item-list .item-card__progress > b { margin-right: 0; }
+.item-list .item-card__progress-full { display: block; min-width: 0; margin: 0; color: #495c54; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.item-list .item-card__progress > div { display: grid; grid-column: 1 / -1; gap: 7px; margin-top: 8px; cursor: default; }
+.item-list .item-card__progress textarea { width: 100%; min-width: 0; border: 1px solid var(--input); border-radius: var(--radius-md); padding: 8px 9px; resize: vertical; color: var(--foreground); background: var(--card); font: inherit; font-size: 13px; line-height: 1.45; }
+.item-list .item-card__situation { display: flex; align-items: baseline; gap: 5px; color: #495c54; font-size: 13px; line-height: 1.45; }
+.item-list .item-card__situation span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-list .item-card__body section[aria-label="跟进清单"] > ul { display: grid; gap: 5px; margin: 5px 0 7px; padding: 0; list-style: none; }
+.item-list .item-card__body section[aria-label="跟进清单"] li { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.item-list .item-card__body section[aria-label="跟进清单"] li input[type=checkbox] { width: 15px; height: 15px; margin: 0; accent-color: var(--primary); }
+.item-list .item-card__body section[aria-label="跟进清单"] li input:not([type=checkbox]) { width: 100%; min-width: 0; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 5px 7px; color: var(--foreground); background: var(--card); font: inherit; font-size: 12px; }
+.item-list .item-card__body section[aria-label="跟进清单"] > p { margin: 5px 0 7px; color: var(--muted-foreground); font-size: 12px; }
+.item-list .item-card__body .icon-button { width: 24px; height: 24px; color: var(--destructive); font-size: 17px; }
+.item-list .item-card__notes { color: #495c54; font-size: 13px; line-height: 1.45; }
+.item-list .item-card__notes span { overflow-wrap: anywhere; }
+.item-list .item-card__body > small { color: var(--primary); font-size: 12px; }
+.item-list .item-card__body > p[role=alert] { border: 1px solid #f0cbc8; border-radius: var(--radius-md); padding: 8px 9px; color: #9a3833; background: var(--destructive-soft); font-size: 12px; }
+.item-list .item-card :disabled { color: #7d8e85; background: #f1f4f2; }
+.item-list .item-card input[type=checkbox]:disabled { opacity: .65; }
+.item-list .item-card .status-dot { animation: item-card-breathe 2.8s ease-in-out infinite; box-shadow: 0 0 0 3px rgb(154 167 161 / 12%); }
+.item-list .item-card .status-dot.todo { background: #9aa7a1; }
+.item-list .item-card .status-dot.doing { background: #39a978; box-shadow: 0 0 0 3px rgb(57 169 120 / 12%); }
+.item-list .item-card .status-dot.paused { background: #da6662; box-shadow: 0 0 0 3px rgb(218 102 98 / 12%); }
+.item-list .item-card .status-dot.done { background: #e4a13e; box-shadow: 0 0 0 3px rgb(228 161 62 / 12%); }
+@keyframes item-card-breathe { 0%, 100% { transform: scale(1); opacity: .84; } 50% { transform: scale(1.14); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .item-list .item-card .status-dot { animation: none; } }
-@media (max-width: 430px) { .item-list .item-card { padding: 10px; }.item-list .item-card__status { width: 74px; }.item-list .item-card__header .item-copy strong { font-size: 16px; } }
+@media (max-width: 430px) { .item-list .item-card { padding: 10px; } .item-list .item-card__status { width: 74px; } .item-list .item-card__header .item-copy strong { font-size: 15px; } }
