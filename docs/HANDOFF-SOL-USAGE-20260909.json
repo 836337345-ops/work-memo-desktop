@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "documentType": "sol_usage_audit_handoff",
+  "generatedAt": "2026-09-09",
+  "project": "工作备忘录",
+  "purpose": "记录本项目 Sol 用量异常偏高的已核查原因、证据边界与后续协作建议，供下一任项目总 PM 接管时执行。",
+  "scope": {
+    "auditedThreads": [
+      {
+        "title": "项目总PM",
+        "threadId": "01a07297-1fd3-7043-b38f-6a4f4f645e02",
+        "period": "2026-09-05 至 2026-09-08",
+        "role": "旧项目总 PM，截图中 9 月 5 至 7 日 Sol 用量的主要候选来源"
+      },
+      {
+        "title": "项目2期PM",
+        "threadId": "01a07f1f-98be-72c2-ac6b-cdcf4e2dda50",
+        "createdAt": "2026-09-08 11:46:12 +08:00",
+        "role": "当前 PM；不可能造成截图中 9 月 6、7 日的 Sol 用量"
+      }
+    ],
+    "notInScope": [
+      "无法从个人用量图精确换算到单个线程、单条命令或单次模型回复的实际额度。",
+      "截图按日期和模型汇总全账户 Work、Codex 与其他代理活动，不按项目或任务窗口归属。",
+      "开发员与测试员的 Terra 消耗不归入本 Sol PM 审计。"
+    ]
+  },
+  "verifiedConclusion": "Sol 消耗偏高的主因不是一次正常的项目集成，而是旧 PM 将长时间运行的调试程序、重复的 PM 级测试、频繁轮询、重复文档与 Git 检查、任务登记故障恢复和重复可见任务复核混合在同一批 Sol 长回合中。",
+  "evidence": {
+    "oldPmAggregateInvocationCounts": {
+      "gitStatusOrLog": 206,
+      "gitDiffOrFormatCheck": 140,
+      "projectDocumentReads": 111,
+      "worktreeInventory": 38,
+      "taskListOrTaskDetailReads": 43,
+      "taskCreateOrFollowUpActions": 84,
+      "taskWaitCalls": 96,
+      "frontendTestOrBuildRuns": 31,
+      "nativeRuntimeTestOrPackagingRuns": 29
+    },
+    "notableLongPmTurns": [
+      {
+        "date": "2026-09-06",
+        "durationMinutes": 40.5,
+        "topic": "V2.2 任务卡、集成、测试协调与桌面验收"
+      },
+      {
+        "date": "2026-09-06",
+        "durationMinutes": 29.6,
+        "topic": "筛选、备份与保存竞态保护；QA 通过后扩展了新的数据保护行为并重新复测"
+      },
+      {
+        "date": "2026-09-06",
+        "durationMinutes": 27.8,
+        "topic": "V2.4 工作树清理、任务分发、集成、QA、调试启动被合并在一个长回合"
+      },
+      {
+        "date": "2026-09-07",
+        "durationMinutes": 32.2,
+        "topic": "V2.5 日历功能的集成、PM 复验、独立 QA 与调试启动"
+      },
+      {
+        "date": "2026-09-08",
+        "durationMinutes": 42.5,
+        "topic": "V2.9 任务正式 ID 恢复、工作树依赖脚本修复、依赖搬移、集成与复测"
+      }
+    ],
+    "foregroundDevServer": {
+      "version": "V2.4",
+      "command": "npm run tauri -- dev --config src-tauri/tauri.dev.conf.json",
+      "observedDurationSeconds": 23724,
+      "observedDurationApproximation": "约 6 小时 35 分钟",
+      "finding": "独立 QA 和集成检查完成后，Sol PM 前台保持调试服务运行以保留用户验收窗口。该做法使 PM 长回合持续存在，属于最明显的可避免消耗。"
+    }
+  },
+  "actionAssessment": [
+    {
+      "action": "在 Sol PM 回合中前台持续运行调试程序",
+      "assessment": "应停止",
+      "why": "启动调试版供用户验收是必要的，但保持 PM 回合和前台命令运行数小时没有必要。",
+      "replacement": "由 Terra 验收任务在隔离数据目录完成短时启动验证；随后结束任务。用户验收时单独启动程序，不让 PM 等待。"
+    },
+    {
+      "action": "先使用不可见内部子代理完成 V2.8，再补建 4 个可见复核任务",
+      "assessment": "应停止",
+      "why": "后建的开发员 A/B/C 与 QA 窗口主要是复核已有交付，造成重复协调、重复上下文和重复测试。",
+      "replacement": "从首次开发起只创建用户可见的独立开发与 QA 任务；不得用隐藏代理完成业务开发后再补做可见流程。"
+    },
+    {
+      "action": "PM 在开发员自测与独立 QA 之外反复执行完整测试、构建、原生启动和界面复验",
+      "assessment": "应大幅收敛",
+      "why": "集成节点的一次 PM 检查是合理的；对每个小修订重复执行完整链路，会与 Terra 开发、QA 的验证重叠。",
+      "replacement": "PM 只在固定集成提交执行一次明确的最终检查；组件测试和桌面流程由 Terra 开发员、测试员负责。"
+    },
+    {
+      "action": "高频 Git 状态、差异、文档读取、任务列表读取和等待轮询",
+      "assessment": "应收敛到关键节点",
+      "why": "206 次 Git 状态或日志、140 次差异检查、111 次文档读取与 96 次等待调用远超任务开始、提交、集成、验收四个节点所需。",
+      "replacement": "每个任务只在启动、开发员提交、PM 集成、QA 结论四个节点刷新状态；等待其他任务时使用一次带游标的长等待，不进行短间隔轮询。"
+    },
+    {
+      "action": "QA 已通过后，PM 自行新增保存竞态保护并再次派开发和复测",
+      "assessment": "必须先确认",
+      "why": "该保护有价值，但它改变用户可见的离开/保存行为，属于新需求或范围扩展。",
+      "replacement": "将风险写入待办与验收报告，向用户说明影响；只有用户确认后才建立新任务卡。"
+    },
+    {
+      "action": "把任务 ID 恢复、依赖脚本修复、依赖备份搬移与功能集成混在一个 Sol 长回合",
+      "assessment": "应拆分",
+      "why": "故障恢复有必要，但它不是业务集成；混合执行放大了 PM 的上下文和复核成本。",
+      "replacement": "标记为“环境阻断”，建立单独的基础设施任务；修复完成并有可复用检查结果后，再恢复原开发与 QA 任务。"
+    }
+  ],
+  "actionsThatRemainNecessary": [
+    "以明确提交号集成开发员交付，并检查冲突与修改范围。",
+    "发现 Windows 原生标题权限缺失后，退回原开发员修复并要求独立复测。",
+    "独立 QA 在固定集成提交上执行隔离测试，且不接触真实用户数据。",
+    "用户明确授权后构建安装包、核对产物哈希，并以隔离数据目录做一次短时启动验证。"
+  ],
+  "recommendedOperatingModel": {
+    "status": "建议方案；修改 AGENTS.md、协作规则或模型默认值前必须取得用户确认。",
+    "solPm": [
+      "只负责需求确认、任务卡、公共契约、开发提交范围审查、一次集成、QA 结论审查和面向用户的阶段结论。",
+      "不运行长驻调试服务，不连续轮询任务，不重复阅读完整历史文档。",
+      "每个版本最多保留一个活跃 PM 窗口；旧 PM 接管后只读归档，不并行指挥。"
+    ],
+    "terraDeveloper": [
+      "负责业务代码、相关组件测试、开发构建和需要的真实桌面短时验证。",
+      "修复缺陷必须回到原开发任务，避免 PM 直接承担业务实现。"
+    ],
+    "terraQa": [
+      "负责固定提交上的独立测试、完整测试与构建、隔离桌面验证及 QA 报告。",
+      "不能把真实 Windows 验证留给 Sol PM；无法验证时必须明确报告，而非默认通过。"
+    ],
+    "lunaOptional": [
+      "可用于无业务判断的文档格式检查、任务表字段整理和非关键只读盘点。",
+      "不得用于代替开发、集成或独立验收结论。"
+    ],
+    "fourStageCheckpoints": [
+      "任务启动：一次核对任务 ID、工作树、分支、基线和依赖。",
+      "开发提交：开发员报告提交与自测；PM 只审查范围和冲突。",
+      "固定集成：PM 合并后运行一次版本级检查。",
+      "独立 QA：测试员在唯一固定提交上验证并报告；通过后交用户验收。"
+    ]
+  },
+  "handoffInstructionsForNextPm": [
+    "先读取本文件、docs/ACTIVE-VERSION.md、docs/PROJECT-HANDOFF.md 与当前 Git 状态；不要重读全量历史对话或所有旧版本文档。",
+    "先判断新需求是微调、业务逻辑、数据安全还是发布；只有后 3 类默认进入完整开发加独立 QA 流程。",
+    "微调需求仍须遵守用户确认与测试要求，但避免把每个 CSS/文案改动升级为多轮 Sol PM 全量回归。",
+    "不得在 PM 中使用隐藏子代理开发业务；不得在用户没有明确授权时新增数据保护、清理、打包、发布或范围扩展。",
+    "任何环境故障先单列为“环境阻断”；修复后复用原任务，避免重建重复任务。",
+    "调试程序启动成功后记录 PID、数据目录和固定提交即可；结束 Sol PM 回合，不等待用户长时间操作。"
+  ],
+  "officialReference": {
+    "title": "GPT-5.6 and GPT-6 Pro in ChatGPT",
+    "url": "https://help.openai.com/en/articles/20001354-gpt-56-and-gpt-6-pro-in-chatgpt",
+    "usage": "模型定位参考：Sol 适合复杂和长链路工作；Terra 是日常工作在能力、速度和成本之间的平衡选项。个人用量图仍不能精确归因到单个任务。"
+  }
+}
