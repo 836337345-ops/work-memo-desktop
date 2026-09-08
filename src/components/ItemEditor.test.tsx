@@ -31,9 +31,9 @@ describe('V2.8 ItemEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存并关闭' })); await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2)); expect(props.onCancel).toHaveBeenCalled();
   });
 
-  it('创建使用统一保存按钮，成功后关闭编辑栏', async () => {
+  it('新建和已有事项统一使用顶部保存并关闭按钮，成功后关闭编辑栏', async () => {
     const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [] }; vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
-    render(<ItemEditor {...props} item={null} />); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '创建并关闭' }));
+    render(<ItemEditor {...props} item={null} />); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     await waitFor(() => expect(api.createItem).toHaveBeenCalled()); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
   });
 
