@@ -105,4 +105,23 @@ describe('V2.8 导出筛选', () => {
 
     expect(screen.getAllByRole('checkbox').slice(-4).every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
   });
+
+  it('用户手动全选或勾选分类后，后续分类载入不会重置该选择', () => {
+    const expandedCategories = [...categories, { id: 'notice', name: '通知', sortOrder: 2 }];
+    const { rerender } = render(<ExportPanel categories={categories} onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '分类全选' }));
+    rerender(<ExportPanel categories={expandedCategories} onClose={vi.fn()} />);
+    expect((screen.getByLabelText('推广') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('活动') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('未分类') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('通知') as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(screen.getByLabelText('推广'));
+    rerender(<ExportPanel categories={[...expandedCategories, { id: 'gift', name: '礼品', sortOrder: 3 }]} onClose={vi.fn()} />);
+    expect((screen.getByLabelText('推广') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('活动') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('通知') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText('礼品') as HTMLInputElement).checked).toBe(false);
+  });
 });

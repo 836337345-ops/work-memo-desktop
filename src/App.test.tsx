@@ -64,6 +64,20 @@ describe('App 工作台名称设置', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
+  it('名称输入框限制为 30 个字符，取消不会保存草稿', async () => {
+    window.localStorage.setItem('work-memo.workbench-name', '原工作台');
+    render(<App />);
+    expect(await screen.findByText('原工作台')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '设置工作台名称' }));
+    const input = screen.getByLabelText('工作台名称') as HTMLInputElement;
+    expect(input.maxLength).toBe(30);
+    fireEvent.change(input, { target: { value: '仅作草稿，不应保存' } });
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('原工作台')).toBeTruthy();
+    expect(window.localStorage.getItem('work-memo.workbench-name')).toBe('原工作台');
+  });
+
   it('恢复默认会移除本机保存的名称并同步窗口标题', async () => {
     window.localStorage.setItem('work-memo.workbench-name', '旧名称');
     render(<App />);
