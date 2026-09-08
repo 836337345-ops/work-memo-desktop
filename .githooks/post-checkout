@@ -1,38 +1,15 @@
 #!/bin/sh
 
-# Codex managed worktrees contain only tracked files. Reuse the verified local
-# dependencies and the D-drive Rust cache instead of reinstalling them on C:.
+# Reuse the verified local dependencies when a worktree is created by Git.
+# Codex managed worktrees should call the same script through Local environments.
 [ "$3" = "1" ] || exit 0
 
 worktree_unix="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-common_git_unix="$(git rev-parse --git-common-dir 2>/dev/null)" || exit 0
-
 cd "$worktree_unix" || exit 0
 WORK_MEMO_WORKTREE_ROOT="$(pwd -W 2>/dev/null)" || exit 0
 
-cd "$common_git_unix/.." || exit 0
-WORK_MEMO_MAIN_ROOT="$(pwd -W 2>/dev/null)" || exit 0
-
-[ "$WORK_MEMO_WORKTREE_ROOT" = "$WORK_MEMO_MAIN_ROOT" ] && exit 0
-
-export WORK_MEMO_WORKTREE_ROOT WORK_MEMO_MAIN_ROOT
-export WORK_MEMO_SHARED_CARGO_TARGET="D:\work-memo-v28-cargo-target"
-
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command '
-  $ErrorActionPreference = "Stop"
-  $nodeSource = Join-Path $env:WORK_MEMO_MAIN_ROOT "node_modules"
-  $nodeLink = Join-Path $env:WORK_MEMO_WORKTREE_ROOT "node_modules"
-  $rustSource = $env:WORK_MEMO_SHARED_CARGO_TARGET
-  $rustLink = Join-Path $env:WORK_MEMO_WORKTREE_ROOT "src-tauri\target"
-  if ((Test-Path -LiteralPath $nodeSource) -and -not (Test-Path -LiteralPath $nodeLink)) {
-    New-Item -ItemType Junction -Path $nodeLink -Target $nodeSource | Out-Null
-  }
-  if (-not (Test-Path -LiteralPath $rustSource)) {
-    New-Item -ItemType Directory -Path $rustSource | Out-Null
-  }
-  if (-not (Test-Path -LiteralPath $rustLink)) {
-    New-Item -ItemType Junction -Path $rustLink -Target $rustSource | Out-Null
-  }
-' >/dev/null 2>&1 || exit 0
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+  -File "$WORK_MEMO_WORKTREE_ROOT\scripts\setup-codex-worktree.ps1" \
+  >/dev/null 2>&1 || exit 0
 
 exit 0
