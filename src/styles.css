@@ -47,6 +47,9 @@ input::placeholder, textarea::placeholder { color: #91a098; }
 .list-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--border); background: #fbfcfb; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 23px 26px 14px; }
 .eyebrow { margin: 0 0 4px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .11em; }
+.workbench-name-row { display: flex; align-items: center; gap: 6px; }
+.workbench-name-settings { border: 0; border-radius: var(--radius-sm); padding: 3px 5px; color: var(--muted-foreground); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.workbench-name-settings:hover { color: var(--primary); background: var(--secondary); }
 .workspace-header h1 { margin: 0; color: var(--foreground); font-size: 24px; font-weight: 700; letter-spacing: -.025em; }
 .count-text { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; }
 .primary-button, .secondary-button { min-height: 36px; border-radius: var(--radius-md); padding: 0 13px; font-size: 13px; font-weight: 650; }
@@ -89,6 +92,11 @@ input::placeholder, textarea::placeholder { color: #91a098; }
 .modal-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .modal-card h2 { margin: 0; color: var(--foreground); font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
 .modal-help { margin: 11px 0 18px; color: var(--muted-foreground); font-size: 13px; line-height: 1.65; }
+.workbench-name-field { display: grid; gap: 7px; color: #4b6158; font-size: 13px; font-weight: 650; }
+.workbench-name-field input { width: 100%; border: 1px solid var(--input); border-radius: var(--radius-md); padding: 9px 10px; outline: none; color: var(--foreground); background: var(--card); font: inherit; }
+.workbench-name-field input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgb(77 155 124 / 13%); }
+.workbench-name-dialog footer { display: flex; align-items: center; gap: 8px; margin-top: 20px; }
+.workbench-name-dialog__spacer { flex: 1; }
 .add-category { display: flex; gap: 9px; }
 .add-category input, .category-list input { min-width: 0; flex: 1; border: 1px solid var(--input); border-radius: var(--radius-md); padding: 8px 10px; outline: none; color: var(--foreground); background: var(--card); }
 .add-category input:focus, .category-list input:focus { border-color: var(--ring); box-shadow: 0 0 0 3px rgb(77 155 124 / 13%); }

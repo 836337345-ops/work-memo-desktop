@@ -4,13 +4,78 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { api } from './api';
 
-vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => ({ onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn() })) }));
+const { appWindow } = vi.hoisted(() => ({ appWindow: { onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn(), setTitle: vi.fn(() => Promise.resolve()) } }));
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => appWindow) }));
 vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn() } }));
 
 afterEach(cleanup);
 beforeEach(() => {
+  window.localStorage.clear();
+  appWindow.setTitle.mockClear();
   vi.mocked(api.listItems).mockResolvedValue([]);
   vi.mocked(api.listCategories).mockResolvedValue([]);
+});
+
+describe('App 工作台名称设置', () => {
+  it('默认显示工作台，并同步默认窗口标题', async () => {
+    render(<App />);
+    expect(await screen.findByText('工作台')).toBeTruthy();
+    await waitFor(() => expect(appWindow.setTitle).toHaveBeenCalledWith('工作备忘录 · 工作台'));
+  });
+
+  it('保存时会去除首尾空白、写入本机设置并同步窗口标题', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '设置工作台名称' }));
+    fireEvent.change(screen.getByLabelText('工作台名称'), { target: { value: '  秋季活动筹备  ' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('秋季活动筹备')).toBeTruthy();
+    expect(window.localStorage.getItem('work-memo.workbench-name')).toBe('秋季活动筹备');
+    await waitFor(() => expect(appWindow.setTitle).toHaveBeenLastCalledWith('工作备忘录 · 秋季活动筹备'));
+  });
+
+  it('重启后从本机设置恢复名称', async () => {
+    window.localStorage.setItem('work-memo.workbench-name', '项目推进');
+    render(<App />);
+    expect(await screen.findByText('项目推进')).toBeTruthy();
+    await waitFor(() => expect(appWindow.setTitle).toHaveBeenCalledWith('工作备忘录 · 项目推进'));
+  });
+
+  it('切换日历、回收站和筛选后不会丢失名称', async () => {
+    window.localStorage.setItem('work-memo.workbench-name', '年度重点');
+    render(<App />);
+    expect(await screen.findByText('年度重点')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
+    expect(await screen.findByRole('button', { name: '关闭日历' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '关闭日历' }));
+    expect(await screen.findByText('年度重点')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '回收站' }));
+    expect(screen.getByText('年度重点')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
+    expect(await screen.findByText('年度重点')).toBeTruthy();
+  });
+
+  it('空名称不能保存，并给出中文提示', async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '设置工作台名称' }));
+    fireEvent.change(screen.getByLabelText('工作台名称'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('请输入工作台名称后再保存。');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('恢复默认会移除本机保存的名称并同步窗口标题', async () => {
+    window.localStorage.setItem('work-memo.workbench-name', '旧名称');
+    render(<App />);
+    await screen.findByText('旧名称');
+    fireEvent.click(screen.getByRole('button', { name: '设置工作台名称' }));
+    fireEvent.click(screen.getByRole('button', { name: '恢复默认' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByText('工作台')).toBeTruthy();
+    expect(window.localStorage.getItem('work-memo.workbench-name')).toBeNull();
+    await waitFor(() => expect(appWindow.setTitle).toHaveBeenLastCalledWith('工作备忘录 · 工作台'));
+  });
 });
 
 describe('App 工作日历入口', () => {
