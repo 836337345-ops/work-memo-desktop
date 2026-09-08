@@ -54,4 +54,36 @@ describe('V2.8 导出筛选', () => {
     fireEvent.click(screen.getByRole('button', { name: '选择位置并导出 TXT' }));
     await waitFor(() => expect(api.exportWorkItems).toHaveBeenCalledWith(expect.objectContaining({ dateFilters: ['today'] })));
   });
+
+  it('三组反选后可分别恢复单项，导出只传递恢复的状态、时间和分类', async () => {
+    render(<ExportPanel categories={categories} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '状态反选' }));
+    fireEvent.click(screen.getByRole('button', { name: '时间反选' }));
+    fireEvent.click(screen.getByRole('button', { name: '分类反选' }));
+
+    expect(screen.getAllByRole('checkbox').every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(screen.getByLabelText('进行中'));
+    fireEvent.click(screen.getByLabelText('下周'));
+    fireEvent.click(screen.getByLabelText('推广'));
+    fireEvent.click(screen.getByRole('button', { name: '选择位置并导出 TXT' }));
+
+    await waitFor(() => expect(api.exportWorkItems).toHaveBeenCalledWith(expect.objectContaining({
+      statuses: ['doing'], dateFilters: ['nextWeek'], categoryIds: ['promotion'],
+    })));
+  });
+
+  it('三组全选能从空选择恢复为不限条件', async () => {
+    render(<ExportPanel categories={categories} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '状态反选' }));
+    fireEvent.click(screen.getByRole('button', { name: '时间反选' }));
+    fireEvent.click(screen.getByRole('button', { name: '分类反选' }));
+    fireEvent.click(screen.getByRole('button', { name: '状态全选' }));
+    fireEvent.click(screen.getByRole('button', { name: '时间全选' }));
+    fireEvent.click(screen.getByRole('button', { name: '分类全选' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择位置并导出 TXT' }));
+
+    await waitFor(() => expect(api.exportWorkItems).toHaveBeenCalledWith(expect.objectContaining({
+      statuses: [], dateFilters: [], categoryIds: [],
+    })));
+  });
 });

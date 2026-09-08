@@ -34,7 +34,7 @@ describe('V2.8 ItemEditor', () => {
   it('新建和已有事项统一使用顶部保存并关闭按钮，成功后关闭编辑栏', async () => {
     const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [] }; vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
     render(<ItemEditor {...props} item={null} />); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
-    await waitFor(() => expect(api.createItem).toHaveBeenCalled()); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
+    await waitFor(() => expect(api.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: '新事项', status: 'doing' }))); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
   });
 
   it('新建草稿预填默认截止日期，已有事项始终使用自身日期', () => {
@@ -111,5 +111,17 @@ describe('V2.8 ItemEditor', () => {
     expect(tools.firstElementChild?.textContent).toBe('添加清单');
     expect(tools.lastElementChild?.textContent).toBe('模板设定/应用');
     expect(section.querySelector('ul')!.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+  });
+
+  it('跟进清单的操作和输入均有可访问名称，添加后可直接填写与完成', () => {
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
+    const section = screen.getByRole('region', { name: '跟进清单' });
+    expect(screen.getByRole('button', { name: '添加清单' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '模板设定/应用' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '添加清单' }));
+    fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '联系负责人' } });
+    expect(screen.getByLabelText('完成：联系负责人')).toBeTruthy();
+    expect(section.querySelector('.item-editor__follow-up-tools')?.nextElementSibling?.tagName).toBe('UL');
   });
 });
