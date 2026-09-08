@@ -66,6 +66,18 @@ describe('App 工作台名称设置', () => {
     expect(await screen.findByText('年度重点')).toBeTruthy();
   });
 
+  it('列表页和日历页不在中间区域重复显示工作台名称或名称设置入口', async () => {
+    window.localStorage.setItem('work-memo.workbench-name', '年度重点');
+    render(<App />);
+    await screen.findByText('年度重点', { selector: '.sidebar-workbench-name' });
+    expect(document.querySelector('.list-pane .sidebar-workbench-name')).toBeNull();
+    expect(document.querySelector('.workspace-header .sidebar-workbench-settings')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
+    await screen.findByRole('button', { name: '关闭日历' });
+    expect(document.querySelector('.list-pane .sidebar-workbench-name')).toBeNull();
+    expect(document.querySelector('.work-calendar .sidebar-workbench-settings')).toBeNull();
+  });
+
   it('空名称不能保存，并给出中文提示', async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '修改' }));

@@ -65,7 +65,7 @@ describe('V2 工作台导航', () => {
   it('在侧栏顶部显示可截断的工作台名称和修改入口，并保留日历激活态', () => {
     const props = setup();
     cleanup();
-    props.workbenchName = '这是一个用于验证侧栏布局的三十字工作台名称示例内容';
+    props.workbenchName = '名'.repeat(30);
     props.calendar = true;
     render(<Sidebar {...props} />);
     const name = screen.getByText(props.workbenchName);
@@ -78,6 +78,8 @@ describe('V2 工作台导航', () => {
 
   it('将修改入口保持为蓝色文字按钮，不回退为绿色主色', () => {
     const css = readFileSync('src/components/workbench/sidebar.css', 'utf8');
+    expect(css).toMatch(/\.sidebar-workbench-name \{[^}]*min-width: 0[^}]*overflow: hidden[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
+    expect(css).toMatch(/\.sidebar-workbench-settings \{[^}]*flex: none/);
     expect(css).toMatch(/\.sidebar-workbench-settings \{[^}]*color: #2563eb/);
     expect(css).toMatch(/\.sidebar-workbench-settings:hover, \.sidebar-workbench-settings:focus-visible \{[^}]*color: #1d4ed8/);
     expect(css).not.toMatch(/\.sidebar-workbench-settings \{[^}]*color: var\(--primary\)/);
