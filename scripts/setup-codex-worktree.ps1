@@ -8,7 +8,7 @@ if (-not [System.IO.Path]::IsPathRooted($commonGit)) {
 $mainRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $commonGit)).Path
 
 if ($worktreeRoot -eq $mainRoot) {
-  Write-Output '当前为主工作目录，无需初始化。'
+  Write-Output 'Main worktree detected; no dependency links are required.'
   exit 0
 }
 
@@ -19,7 +19,7 @@ $rustSource = Join-Path $sharedCache 'cargo-target'
 $rustLink = Join-Path $worktreeRoot 'src-tauri\target'
 
 if (-not (Test-Path -LiteralPath $nodeSource)) {
-  throw "主项目依赖不存在，请先在主工作目录运行 npm install：$nodeSource"
+  throw "Main worktree dependencies are missing. Run npm install in the main worktree first: $nodeSource"
 }
 
 if (-not (Test-Path -LiteralPath $sharedCache)) {
@@ -36,4 +36,4 @@ if (-not (Test-Path -LiteralPath $rustLink)) {
   New-Item -ItemType Junction -Path $rustLink -Target $rustSource | Out-Null
 }
 
-Write-Output "工作树依赖已就绪：$worktreeRoot"
+Write-Output "Worktree dependencies are ready: $worktreeRoot"
