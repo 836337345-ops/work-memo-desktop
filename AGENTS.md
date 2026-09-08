@@ -29,4 +29,4 @@
 - 前端最低验收为 `npm test` 和 `npm run build`；数据层改动还需执行 `cargo test --manifest-path src-tauri/Cargo.toml`。
 - 每个大版本结束后更新交接快照和 QA 报告；新 PM 对话优先读取快照，不依赖完整聊天历史。
 
-完整流程见 `docs/PROJECT-COLLABORATION.md`，当前交接状态见 `docs/HANDOFF-V2.8.md`。
+完整流程见 `docs/PROJECT-COLLABORATION.md`，当前项目事实见 `docs/PROJECT-HANDOFF.md`；版本过程记录见 `docs/HANDOFF-V2.8.md`。
