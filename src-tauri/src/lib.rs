@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 type R<T> = Result<T, String>;
 const VERSION: u32 = 1;
-const DEFAULTS: [&str; 6] = ["推广", "包装", "活动", "拓展", "方案", "其他"];
+const DEFAULTS: [&str; 8] = ["推广", "销售", "拓展", "包装", "礼品", "事务", "活动", "其他"];
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1316,17 +1316,46 @@ mod tests {
         let d = tempdir().unwrap();
         let p = d.path().join("x.db");
         let mut s = Store::open(p.clone()).unwrap();
-        assert_eq!(s.cats().unwrap().len(), 6);
+        let expected_defaults = vec![
+            "推广".to_string(),
+            "销售".to_string(),
+            "拓展".to_string(),
+            "包装".to_string(),
+            "礼品".to_string(),
+            "事务".to_string(),
+            "活动".to_string(),
+            "其他".to_string(),
+        ];
+        assert_eq!(
+            s.cats()
+                .unwrap()
+                .into_iter()
+                .map(|category| category.name)
+                .collect::<Vec<_>>(),
+            expected_defaults
+        );
         let a = s.create(input()).unwrap();
         s.progress_add(&a.id, "初稿").unwrap();
         let mut x = s.detail(&a.id).unwrap().input;
         x.title = "B".into();
         s.update(&a.id, x).unwrap();
+        s.cat_new("自定义分类").unwrap();
         drop(s);
         let s = Store::open(p).unwrap();
         let x = s.detail(&a.id).unwrap();
         assert_eq!(x.input.title, "B");
         assert_eq!(x.progress.len(), 1);
+        assert_eq!(
+            s.cats()
+                .unwrap()
+                .into_iter()
+                .map(|category| category.name)
+                .collect::<Vec<_>>(),
+            expected_defaults
+                .into_iter()
+                .chain(std::iter::once("自定义分类".to_string()))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -1717,6 +1746,6 @@ mod export_tests {
             "工作备份文件20260906-2.json"
         );
         assert!(Path::new(&first.path).is_file() && Path::new(&second.path).is_file());
-        assert_eq!(first.info.category_count, 6);
+        assert_eq!(first.info.category_count, 8);
     }
 }
