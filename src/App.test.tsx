@@ -26,7 +26,7 @@ describe('App 工作日历入口', () => {
     expect(search.value).toBe('');
   });
 
-  it('点击工作日历后切换只读月历并隐藏编辑栏', async () => {
+  it('日历模式可通过两个快捷入口返回列表，并恢复对应筛选', async () => {
     render(<App />);
     const entry = await screen.findByRole('button', { name: '工作日历' });
     fireEvent.click(entry);
@@ -36,6 +36,10 @@ describe('App 工作日历入口', () => {
     expect(screen.getByRole('button', { name: '关闭日历' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: '显示进行中工作' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
   });
 
   it('从日历事项返回工作台并展开对应卡片，但不打开编辑栏', async () => {
