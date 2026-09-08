@@ -11,6 +11,7 @@ export interface FilterState {
 
 interface SidebarProps {
   categories: Category[];
+  workbenchName: string;
   filters: FilterState;
   trash: boolean;
   calendar: boolean;
@@ -24,6 +25,7 @@ interface SidebarProps {
   onManageCategories: () => void;
   onOpenBackup: () => void;
   onOpenExport: () => void;
+  onOpenWorkbenchNameSettings: () => void;
 }
 
 type Group = 'status' | 'time' | 'category';
@@ -46,13 +48,13 @@ function readExpanded(): ExpandedState {
   } catch { return defaultExpanded; }
 }
 
-export function Sidebar({ categories, filters, trash, calendar, onDateFilter, onCategory, onStatus, onTrash, onShowAll, onShowDoing, onOpenCalendar, onManageCategories, onOpenBackup, onOpenExport }: SidebarProps) {
+export function Sidebar({ categories, workbenchName, filters, trash, calendar, onDateFilter, onCategory, onStatus, onTrash, onShowAll, onShowDoing, onOpenCalendar, onManageCategories, onOpenBackup, onOpenExport, onOpenWorkbenchNameSettings }: SidebarProps) {
   const [expanded, setExpanded] = useState<ExpandedState>(readExpanded);
   const toggle = (group: Group) => setExpanded((current) => { const next = { ...current, [group]: !current[group] }; try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* 本机存储不可用时不影响导航 */ } return next; });
   const categoryLabel = filters.categoryId === undefined ? '全部分类' : filters.categoryId === null ? '未分类' : categories.find((category) => category.id === filters.categoryId)?.name ?? '未分类';
   const summary = { status: filters.status === 'all' ? '全部状态' : STATUS_LABELS[filters.status], time: dateLinks.find((link) => link.value === filters.date)?.label ?? '全部时间', category: categoryLabel };
   return <aside className="sidebar" aria-label="事项导航">
-    <div className="brand"><span className="brand-mark">✓</span><span>工作备忘录</span></div>
+    <div className="brand"><span className="sidebar-workbench-name" title={workbenchName}>{workbenchName}</span><button type="button" className="sidebar-workbench-settings" onClick={onOpenWorkbenchNameSettings}>修改</button></div>
     <button className={calendar ? 'sidebar-calendar active' : 'sidebar-calendar'} onClick={onOpenCalendar}>工作日历</button>
     <button className="sidebar-show-all" onClick={onShowAll}>显示全部</button>
     <button className="sidebar-show-doing" onClick={onShowDoing}>显示进行中工作</button>

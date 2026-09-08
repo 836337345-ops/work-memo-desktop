@@ -29,7 +29,7 @@ export function saveWorkbenchName(value: string) {
 
 export async function updateWindowTitle(name: string) {
   try {
-    await getCurrentWindow().setTitle(`工作备忘录 · ${name}`);
+    await getCurrentWindow().setTitle(name);
   } catch (reason) {
     console.warn('工作台名称已保存，但窗口标题同步失败：', reason);
   }

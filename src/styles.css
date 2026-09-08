@@ -33,8 +33,7 @@ input::placeholder, textarea::placeholder { color: #91a098; }
 .app-shell.without-editor { grid-template-columns: 220px minmax(0, 1fr); }
 .app-shell.without-editor .editor-pane { display: none; }
 .sidebar { display: flex; min-height: 0; flex-direction: column; gap: 14px; padding: 20px 13px 14px; overflow-x: hidden; overflow-y: auto; border-right: 1px solid var(--sidebar-border); background: var(--sidebar); }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 10px; color: #1d4f3e; font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
-.brand-mark { display: grid; width: 27px; height: 27px; place-items: center; color: var(--primary-foreground); background: var(--primary); border-radius: 8px; box-shadow: var(--shadow-sm); font-size: 14px; }
+.brand { display: flex; min-width: 0; align-items: center; gap: 5px; padding: 0 8px 10px; color: #1d4f3e; font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
 .sidebar nav { display: flex; flex-direction: column; gap: 3px; }
 .nav-title { margin: 12px 9px 5px; color: var(--muted-foreground); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
 .nav-heading { display: flex; align-items: center; justify-content: space-between; }
@@ -47,9 +46,6 @@ input::placeholder, textarea::placeholder { color: #91a098; }
 .list-pane { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--border); background: #fbfcfb; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 23px 26px 14px; }
 .eyebrow { margin: 0 0 4px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .11em; }
-.workbench-name-row { display: flex; align-items: center; gap: 6px; }
-.workbench-name-settings { border: 0; border-radius: var(--radius-sm); padding: 3px 5px; color: var(--muted-foreground); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
-.workbench-name-settings:hover { color: var(--primary); background: var(--secondary); }
 .workspace-header h1 { margin: 0; color: var(--foreground); font-size: 24px; font-weight: 700; letter-spacing: -.025em; }
 .count-text { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; }
 .primary-button, .secondary-button { min-height: 36px; border-radius: var(--radius-md); padding: 0 13px; font-size: 13px; font-weight: 650; }

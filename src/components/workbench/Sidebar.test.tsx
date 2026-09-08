@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sidebar } from './Sidebar';
 
 const setup = () => {
-  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onShowDoing: vi.fn(), onOpenCalendar: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn() };
+  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], workbenchName: '工作台', filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onShowDoing: vi.fn(), onOpenCalendar: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn(), onOpenWorkbenchNameSettings: vi.fn() };
   render(<Sidebar {...props} />);
   return props;
 };
@@ -58,5 +58,19 @@ describe('V2 工作台导航', () => {
     expect(calendar.closest('.sidebar-bottom')).toBeNull();
     fireEvent.click(calendar);
     expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
+  });
+
+  it('在侧栏顶部显示可截断的工作台名称和修改入口，并保留日历激活态', () => {
+    const props = setup();
+    cleanup();
+    props.workbenchName = '这是一个用于验证侧栏布局的三十字工作台名称示例内容';
+    props.calendar = true;
+    render(<Sidebar {...props} />);
+    const name = screen.getByText(props.workbenchName);
+    expect(name.className).toContain('sidebar-workbench-name');
+    expect(screen.getByRole('button', { name: '修改' }).className).toContain('sidebar-workbench-settings');
+    expect(screen.getByRole('button', { name: '工作日历' }).className).toContain('active');
+    fireEvent.click(screen.getByRole('button', { name: '修改' }));
+    expect(props.onOpenWorkbenchNameSettings).toHaveBeenCalledTimes(1);
   });
 });
