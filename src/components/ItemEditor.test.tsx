@@ -105,7 +105,7 @@ describe('V2.8 ItemEditor', () => {
 
   it('跟进区首行左右提供添加清单和模板设定入口，具体清单位于其后', () => {
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat', followUps: [{ id: 'f1', text: '准备场地', done: false }] })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
-    const section = screen.getByLabelText('跟进清单');
+    const section = screen.getByRole('region', { name: '跟进清单' });
     const tools = section.firstElementChild as HTMLElement;
     expect(tools.classList.contains('item-editor__follow-up-tools')).toBe(true);
     expect(tools.firstElementChild?.textContent).toBe('添加清单');
