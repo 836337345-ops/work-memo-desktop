@@ -1,3 +1,5 @@
+import { getCurrentWindow } from '@tauri-apps/api/window';
+
 export const DEFAULT_WORKBENCH_NAME = '工作台';
 
 const STORAGE_KEY = 'work-memo.workbench-name';
@@ -25,9 +27,10 @@ export function saveWorkbenchName(value: string) {
   }
 }
 
-export function updateWindowTitle(name: string) {
+export async function updateWindowTitle(name: string) {
   try {
-    void getCurrentWindow().setTitle(`工作备忘录 · ${name}`).catch(() => undefined);
-  } catch { /* 窗口标题同步失败不影响工作台 */ }
+    await getCurrentWindow().setTitle(`工作备忘录 · ${name}`);
+  } catch (reason) {
+    console.warn('工作台名称已保存，但窗口标题同步失败：', reason);
+  }
 }
-import { getCurrentWindow } from '@tauri-apps/api/window';

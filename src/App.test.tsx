@@ -23,6 +23,15 @@ describe('App 工作台名称设置', () => {
     await waitFor(() => expect(appWindow.setTitle).toHaveBeenCalledWith('工作备忘录 · 工作台'));
   });
 
+  it('窗口标题同步失败时保留工作台可用性并输出诊断', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    appWindow.setTitle.mockRejectedValueOnce(new Error('权限不足'));
+    render(<App />);
+    expect(await screen.findByText('工作台')).toBeTruthy();
+    await waitFor(() => expect(warning).toHaveBeenCalledWith('工作台名称已保存，但窗口标题同步失败：', expect.any(Error)));
+    warning.mockRestore();
+  });
+
   it('保存时会去除首尾空白、写入本机设置并同步窗口标题', async () => {
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '设置工作台名称' }));
