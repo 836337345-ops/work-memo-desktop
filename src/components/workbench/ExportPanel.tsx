@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { api } from '../../api';
 import { STATUS_LABELS, type Category, type ExportDateFilter, type ItemStatus } from '../../types';
@@ -33,8 +33,17 @@ export function ExportPanel({ categories, onClose }: ExportPanelProps) {
   const [statuses, setStatuses] = useState<ItemStatus[]>(() => [...allStatusValues]);
   const [dateFilters, setDateFilters] = useState<ExportDateFilter[]>(() => [...allDateValues]);
   const [categoryIds, setCategoryIds] = useState<Array<string | null>>(() => [...allCategoryValues]);
+  const hasManuallySelectedCategories = useRef(false);
   const [notice, setNotice] = useState(''); const [error, setError] = useState(''); const [exporting, setExporting] = useState(false);
   const toggle = <T,>(value: T, values: T[], setValues: (next: T[]) => void) => setValues(values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value]);
+  const updateCategoryIds = (next: Array<string | null>) => {
+    hasManuallySelectedCategories.current = true;
+    setCategoryIds(next);
+  };
+
+  useEffect(() => {
+    if (!hasManuallySelectedCategories.current) setCategoryIds([...allCategoryValues]);
+  }, [categories]);
   const exportText = async () => {
     if (statuses.length === 0 || dateFilters.length === 0 || categoryIds.length === 0) {
       setNotice('');
@@ -59,6 +68,6 @@ export function ExportPanel({ categories, onClose }: ExportPanelProps) {
   return <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="export-title" onKeyDown={(event) => event.key === 'Escape' && onClose()}><div className="modal-card export-panel"><header><div><p className="eyebrow">文本文件</p><h2 id="export-title">导出事项</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭">×</button></header><p className="modal-help">状态、时间和分类均可多选；每组至少保留一项。时间全选代表不限日期，包含未设日期和更远日期。导出不包含回收站事项。</p>
     <fieldset className="export-options"><legend>状态</legend><SelectionActions label="状态" available={allStatusValues} selected={statuses} onChange={setStatuses} /><div className="export-option-grid">{statusOptions.map((option) => <label key={option.value}><input type="checkbox" checked={statuses.includes(option.value)} onChange={() => toggle(option.value, statuses, setStatuses)} />{option.label}</label>)}</div></fieldset>
     <fieldset className="export-options"><legend>时间</legend><SelectionActions label="时间" available={allDateValues} selected={dateFilters} onChange={setDateFilters} /><div className="export-option-grid">{dateOptions.map((option) => <label key={option.value}><input type="checkbox" checked={dateFilters.includes(option.value)} onChange={() => toggle(option.value, dateFilters, setDateFilters)} />{option.label}</label>)}</div></fieldset>
-    <fieldset className="export-options"><legend>分类</legend><SelectionActions label="分类" available={allCategoryValues} selected={categoryIds} onChange={setCategoryIds} /><div className="export-option-grid">{categories.map((category) => <label key={category.id}><input type="checkbox" checked={categoryIds.includes(category.id)} onChange={() => toggle(category.id, categoryIds, setCategoryIds)} />{category.name}</label>)}<label><input type="checkbox" checked={categoryIds.includes(null)} onChange={() => toggle(null, categoryIds, setCategoryIds)} />未分类</label></div></fieldset>
+    <fieldset className="export-options"><legend>分类</legend><SelectionActions label="分类" available={allCategoryValues} selected={categoryIds} onChange={updateCategoryIds} /><div className="export-option-grid">{categories.map((category) => <label key={category.id}><input type="checkbox" checked={categoryIds.includes(category.id)} onChange={() => updateCategoryIds(categoryIds.includes(category.id) ? categoryIds.filter((entry) => entry !== category.id) : [...categoryIds, category.id])} />{category.name}</label>)}<label><input type="checkbox" checked={categoryIds.includes(null)} onChange={() => updateCategoryIds(categoryIds.includes(null) ? categoryIds.filter((entry) => entry !== null) : [...categoryIds, null])} />未分类</label></div></fieldset>
     <div className="export-footer"><button className="secondary-button" onClick={onClose}>取消</button><button className="primary-button" onClick={exportText} disabled={exporting}>{exporting ? '正在导出…' : '选择位置并导出 TXT'}</button></div>{notice && <p className="form-notice" role="status">{notice}</p>}{error && <p className="form-error" role="alert">{error}</p>}</div></section>;
 }

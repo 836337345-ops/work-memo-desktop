@@ -86,4 +86,23 @@ describe('V2.8 导出筛选', () => {
       statuses: [], dateFilters: [], categoryIds: [],
     })));
   });
+
+  it('分类异步载入且用户未操作时仍全选并导出为不限分类', async () => {
+    const { rerender } = render(<ExportPanel categories={[]} onClose={vi.fn()} />);
+
+    rerender(<ExportPanel categories={categories} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getAllByRole('checkbox').slice(-3).every((checkbox) => (checkbox as HTMLInputElement).checked)).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: '选择位置并导出 TXT' }));
+    await waitFor(() => expect(api.exportWorkItems).toHaveBeenCalledWith(expect.objectContaining({ categoryIds: [] })));
+  });
+
+  it('用户手动调整分类后，后续分类变化不覆盖其选择', () => {
+    const { rerender } = render(<ExportPanel categories={categories} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '分类反选' }));
+
+    rerender(<ExportPanel categories={[...categories, { id: 'notice', name: '通知', sortOrder: 2 }]} onClose={vi.fn()} />);
+
+    expect(screen.getAllByRole('checkbox').slice(-4).every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
+  });
 });
