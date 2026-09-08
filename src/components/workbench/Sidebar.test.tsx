@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error Node 类型并非前端生产依赖；Vitest 在 Node 环境中读取样式契约。
+import { readFileSync } from 'node:fs';
 import { Sidebar } from './Sidebar';
 
 const setup = () => {
@@ -72,5 +74,12 @@ describe('V2 工作台导航', () => {
     expect(screen.getByRole('button', { name: '工作日历' }).className).toContain('active');
     fireEvent.click(screen.getByRole('button', { name: '修改' }));
     expect(props.onOpenWorkbenchNameSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('将修改入口保持为蓝色文字按钮，不回退为绿色主色', () => {
+    const css = readFileSync('src/components/workbench/sidebar.css', 'utf8');
+    expect(css).toMatch(/\.sidebar-workbench-settings \{[^}]*color: #2563eb/);
+    expect(css).toMatch(/\.sidebar-workbench-settings:hover, \.sidebar-workbench-settings:focus-visible \{[^}]*color: #1d4ed8/);
+    expect(css).not.toMatch(/\.sidebar-workbench-settings \{[^}]*color: var\(--primary\)/);
   });
 });
