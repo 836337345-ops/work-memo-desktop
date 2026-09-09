@@ -3,10 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { api } from './api';
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 const { appWindow } = vi.hoisted(() => ({ appWindow: { onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn(), setTitle: vi.fn(() => Promise.resolve()) } }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => appWindow) }));
 vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn() } }));
+vi.mock('@tauri-apps/plugin-autostart', () => ({ isEnabled: vi.fn(), enable: vi.fn(), disable: vi.fn() }));
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -14,6 +16,74 @@ beforeEach(() => {
   appWindow.setTitle.mockClear();
   vi.mocked(api.listItems).mockResolvedValue([]);
   vi.mocked(api.listCategories).mockResolvedValue([]);
+  vi.mocked(isEnabled).mockResolvedValue(false);
+  vi.mocked(enable).mockResolvedValue();
+  vi.mocked(disable).mockResolvedValue();
+});
+
+describe('App 开机自启动', () => {
+  it('初始化时读取真实开机自启动状态，读取失败时提示并禁止切换', async () => {
+    vi.mocked(isEnabled).mockRejectedValueOnce(new Error('读取失败'));
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('无法读取开机自启动设置'));
+    expect(toggle.disabled).toBe(true);
+    expect(enable).not.toHaveBeenCalled();
+  });
+
+  it('开启成功后重新读取真实状态', async () => {
+    vi.mocked(isEnabled).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(toggle.disabled).toBe(false));
+    fireEvent.click(toggle);
+    await waitFor(() => expect(enable).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(isEnabled).toHaveBeenCalledTimes(2));
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('关闭成功后重新读取真实状态', async () => {
+    vi.mocked(isEnabled).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'));
+    fireEvent.click(toggle);
+    await waitFor(() => expect(disable).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(isEnabled).toHaveBeenCalledTimes(2));
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('开启或关闭失败时保留原状态并显示提示', async () => {
+    vi.mocked(enable).mockRejectedValueOnce(new Error('写入失败'));
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(toggle.disabled).toBe(false));
+    fireEvent.click(toggle);
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('无法更新开机自启动设置'));
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    cleanup();
+    vi.mocked(isEnabled).mockResolvedValueOnce(true);
+    vi.mocked(disable).mockRejectedValueOnce(new Error('写入失败'));
+    render(<App />);
+    const enabledToggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(enabledToggle.getAttribute('aria-checked')).toBe('true'));
+    fireEvent.click(enabledToggle);
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('无法更新开机自启动设置'));
+    expect(enabledToggle.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('切换期间忽略连续点击', async () => {
+    let finishEnable: (() => void) | undefined;
+    vi.mocked(enable).mockImplementationOnce(() => new Promise<void>((resolve) => { finishEnable = resolve; }));
+    render(<App />);
+    const toggle = await screen.findByRole('switch', { name: '开机自启动' }) as HTMLButtonElement;
+    await waitFor(() => expect(toggle.disabled).toBe(false));
+    fireEvent.click(toggle); fireEvent.click(toggle);
+    expect(enable).toHaveBeenCalledTimes(1);
+    expect(toggle.disabled).toBe(true);
+    finishEnable?.();
+    await waitFor(() => expect(toggle.disabled).toBe(false));
+  });
 });
 
 describe('App 工作台名称设置', () => {

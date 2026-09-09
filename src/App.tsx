@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { api } from './api';
 import ItemEditor from './components/ItemEditor';
 import { BackupPanel } from './components/workbench/BackupPanel';
@@ -21,13 +22,19 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [inlineErrorKind, setInlineErrorKind] = useState<'normal' | 'progress' | null>(null); const [showCategories, setShowCategories] = useState(false); const [showBackup, setShowBackup] = useState(false); const [showExport, setShowExport] = useState(false);
   const [workbenchName, setWorkbenchName] = useState(DEFAULT_WORKBENCH_NAME); const [showWorkbenchNameSettings, setShowWorkbenchNameSettings] = useState(false); const [workbenchNameDraft, setWorkbenchNameDraft] = useState(DEFAULT_WORKBENCH_NAME); const [workbenchNameError, setWorkbenchNameError] = useState('');
+  const [autostartEnabled, setAutostartEnabled] = useState(false); const [autostartReady, setAutostartReady] = useState(false); const [autostartBusy, setAutostartBusy] = useState(false); const [autostartError, setAutostartError] = useState('');
   const editorRef = useRef<EditorHandle>(null); const listRef = useRef<ItemListHandle>(null); const allowClose = useRef(false);
   const prepareAll = useCallback(async () => {
     const [editorCanLeave, listCanLeave] = await Promise.all([editorRef.current?.prepareLeave() ?? true, listRef.current?.prepareLeave() ?? true]);
     return editorCanLeave && listCanLeave;
   }, []);
   const load = useCallback(async () => { try { setError(''); setInlineErrorKind(null); const [nextItems, nextCategories] = await Promise.all([api.listItems(), api.listCategories()]); setItems(nextItems); setCategories(nextCategories); } catch (reason) { setInlineErrorKind(null); setError(`无法读取本地数据：${String(reason)}`); } finally { setLoading(false); } }, []);
+  const readAutostart = useCallback(async () => {
+    try { const enabled = await isEnabled(); setAutostartEnabled(enabled); setAutostartError(''); setAutostartReady(true); return true; }
+    catch { setAutostartError('无法读取开机自启动设置，请稍后重试。'); setAutostartReady(false); return false; }
+  }, []);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void readAutostart(); }, [readAutostart]);
   useEffect(() => { const savedName = readWorkbenchName(); setWorkbenchName(savedName); updateWindowTitle(savedName); }, []);
   useEffect(() => { const appWindow = getCurrentWindow(); let disposed = false; const unlisten = appWindow.onCloseRequested(async (event) => { if (allowClose.current) return; event.preventDefault(); const canLeave = await prepareAll(); if (!canLeave || disposed) return; allowClose.current = true; await appWindow.close(); }); return () => { disposed = true; void unlisten.then((stop) => stop()); }; }, [prepareAll]);
   const visibleItems = useMemo(() => { if (isTrash) return filterItems(items.filter((item) => item.deletedAt !== null), { dateFilter: 'all', query }); return filterItems(items.filter((item) => item.deletedAt === null), { dateFilter: filters.date, categoryId: filters.categoryId, status: filters.status, query }); }, [filters, isTrash, items, query]);
@@ -58,7 +65,14 @@ export default function App() {
     setWorkbenchName(nextName); updateWindowTitle(nextName); closeWorkbenchNameSettings();
   };
   const restoreDefaultWorkbenchName = () => { setWorkbenchNameDraft(DEFAULT_WORKBENCH_NAME); setWorkbenchNameError(''); };
-  return <main className={`app-shell ${target ? 'has-editor' : 'without-editor'}`}><Sidebar categories={categories} workbenchName={workbenchName} filters={filters} trash={isTrash} calendar={showCalendar} onDateFilter={(value) => void changeView(() => { setFilters((current) => ({ ...current, date: value })); setIsTrash(false); })} onCategory={(value) => void changeView(() => { setFilters((current) => ({ ...current, categoryId: value })); setIsTrash(false); })} onStatus={(value) => void changeView(() => { setFilters((current) => ({ ...current, status: value })); setIsTrash(false); })} onTrash={() => void changeView(() => setIsTrash(true))} onShowAll={showAll} onShowDoing={showDoing} onOpenCalendar={openCalendar} onManageCategories={() => void openCategories()} onOpenBackup={() => void openBackup()} onOpenExport={() => void openExport()} onOpenWorkbenchNameSettings={openWorkbenchNameSettings} />
+  const toggleAutostart = async () => {
+    if (autostartBusy || !autostartReady) return;
+    setAutostartBusy(true); setAutostartError('');
+    try { if (autostartEnabled) await disable(); else await enable(); await readAutostart(); }
+    catch { setAutostartError('无法更新开机自启动设置，请稍后重试。'); }
+    finally { setAutostartBusy(false); }
+  };
+  return <main className={`app-shell ${target ? 'has-editor' : 'without-editor'}`}><Sidebar categories={categories} workbenchName={workbenchName} filters={filters} trash={isTrash} calendar={showCalendar} onDateFilter={(value) => void changeView(() => { setFilters((current) => ({ ...current, date: value })); setIsTrash(false); })} onCategory={(value) => void changeView(() => { setFilters((current) => ({ ...current, categoryId: value })); setIsTrash(false); })} onStatus={(value) => void changeView(() => { setFilters((current) => ({ ...current, status: value })); setIsTrash(false); })} onTrash={() => void changeView(() => setIsTrash(true))} onShowAll={showAll} onShowDoing={showDoing} onOpenCalendar={openCalendar} onManageCategories={() => void openCategories()} onOpenBackup={() => void openBackup()} onOpenExport={() => void openExport()} onOpenWorkbenchNameSettings={openWorkbenchNameSettings} autostartEnabled={autostartEnabled} autostartReady={autostartReady} autostartBusy={autostartBusy} autostartError={autostartError} onToggleAutostart={() => void toggleAutostart()} />
     <section className="list-pane" aria-label={showCalendar ? '工作日历' : '事项工作台'}>{showCalendar ? <WorkCalendar items={items} categories={categories} onClose={() => setShowCalendar(false)} onOpenItem={(id) => void openCalendarItem(id)} onNewItem={(date) => void openCalendarNewItem(date)} /> : <><header className="workspace-header"><div><h1>{heading}</h1><p className="count-text">{visibleItems.length} 条事项</p></div>{!isTrash && <button className="primary-button new-button" onClick={() => void requestChange({ type: 'new' })}>＋ 新建事项</button>}</header>
       <div className="filters"><label className="search-field"><span className="sr-only">搜索事项</span><input value={query} onChange={(event) => void changeQuery(event.target.value)} placeholder="搜索标题、内容、进度、跟进或备注" /></label></div>
       {error && <p className="page-error" role="alert">{error}</p>}{loading ? <div className="empty-state"><p>正在载入工作事项…</p></div> : <ItemList ref={listRef} items={visibleItems} categories={categories} selectedId={selectedItem?.id ?? null} editingItemId={target?.type === 'item' ? target.id : null} revealItemId={revealItemId} onSelect={(item) => void requestChange({ type: 'item', id: item.id })} onChanged={saved} onError={(message, kind) => { if (message) { setError(message); setInlineErrorKind(kind); } else if (kind === 'normal' && inlineErrorKind === 'normal') { setError(''); setInlineErrorKind(null); } }} onRestore={isTrash ? restore : undefined} />}</>}</section>

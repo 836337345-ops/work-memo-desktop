@@ -1242,6 +1242,7 @@ fn app_info(s: State<'_, AppState>) -> R<AppInfo> {
 }
 pub fn run() {
     let b = tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|a, _, _| {
             if let Some(w) = a.get_webview_window("main") {

@@ -26,6 +26,11 @@ interface SidebarProps {
   onOpenBackup: () => void;
   onOpenExport: () => void;
   onOpenWorkbenchNameSettings: () => void;
+  autostartEnabled: boolean;
+  autostartReady: boolean;
+  autostartBusy: boolean;
+  autostartError: string;
+  onToggleAutostart: () => void;
 }
 
 type Group = 'status' | 'time' | 'category';
@@ -52,7 +57,7 @@ function readExpanded(): ExpandedState {
   } catch { return defaultExpanded; }
 }
 
-export function Sidebar({ categories, workbenchName, filters, trash, calendar, onDateFilter, onCategory, onStatus, onTrash, onShowAll, onShowDoing, onOpenCalendar, onManageCategories, onOpenBackup, onOpenExport, onOpenWorkbenchNameSettings }: SidebarProps) {
+export function Sidebar({ categories, workbenchName, filters, trash, calendar, onDateFilter, onCategory, onStatus, onTrash, onShowAll, onShowDoing, onOpenCalendar, onManageCategories, onOpenBackup, onOpenExport, onOpenWorkbenchNameSettings, autostartEnabled, autostartReady, autostartBusy, autostartError, onToggleAutostart }: SidebarProps) {
   const [expanded, setExpanded] = useState<ExpandedState>(readExpanded);
   const toggle = (group: Group) => setExpanded((current) => { const next = { ...current, [group]: !current[group] }; try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* 本机存储不可用时不影响导航 */ } return next; });
   const categoryLabel = filters.categoryId === undefined ? '全部分类' : filters.categoryId === null ? '未分类' : categories.find((category) => category.id === filters.categoryId)?.name ?? '未分类';
@@ -76,6 +81,6 @@ export function Sidebar({ categories, workbenchName, filters, trash, calendar, o
         {expanded.category && <div id="category-filter-group" className="sidebar-group-options"><button className={!trash && filters.categoryId === undefined ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(undefined)}>全部分类</button><button className={!trash && filters.categoryId === null ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(null)}>未分类</button>{categories.map((category) => <button key={category.id} className={!trash && filters.categoryId === category.id ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(category.id)}>{category.name}</button>)}</div>}
       </section>
     </nav>
-    <div className="sidebar-bottom"><button className={trash ? 'nav-link active' : 'nav-link'} onClick={onTrash}>回收站</button><button className="nav-link" onClick={onOpenBackup}>备份与恢复</button><button className="nav-link" onClick={onOpenExport}>导出事项</button></div>
+    <div className="sidebar-bottom"><button className={trash ? 'nav-link active' : 'nav-link'} onClick={onTrash}>回收站</button><button className="nav-link" onClick={onOpenBackup}>备份与恢复</button><button className="nav-link" onClick={onOpenExport}>导出事项</button><div className="autostart-control"><span id="autostart-label">开机自启动</span><button type="button" className="autostart-switch" role="switch" aria-labelledby="autostart-label" aria-checked={autostartEnabled} aria-busy={autostartBusy || !autostartReady} disabled={autostartBusy || !autostartReady} onClick={onToggleAutostart}><span aria-hidden="true" /></button>{!autostartReady && !autostartError && <small>正在读取设置…</small>}{autostartError && <p role="alert">{autostartError}</p>}</div></div>
   </aside>;
 }

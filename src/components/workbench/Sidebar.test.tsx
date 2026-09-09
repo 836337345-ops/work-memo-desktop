@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { Sidebar } from './Sidebar';
 
 const setup = () => {
-  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], workbenchName: '工作台', filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onShowDoing: vi.fn(), onOpenCalendar: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn(), onOpenWorkbenchNameSettings: vi.fn() };
+  const props = { categories: [{ id: 'promotion', name: '推广', sortOrder: 0 }], workbenchName: '工作台', filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onShowDoing: vi.fn(), onOpenCalendar: vi.fn(), onManageCategories: vi.fn(), onOpenBackup: vi.fn(), onOpenExport: vi.fn(), onOpenWorkbenchNameSettings: vi.fn(), autostartEnabled: false, autostartReady: true, autostartBusy: false, autostartError: '', onToggleAutostart: vi.fn() };
   render(<Sidebar {...props} />);
   return props;
 };
@@ -102,5 +102,18 @@ describe('V2 工作台导航', () => {
     expect(css).toMatch(/\.sidebar-workbench-settings \{[^}]*color: #2563eb/);
     expect(css).toMatch(/\.sidebar-workbench-settings:hover, \.sidebar-workbench-settings:focus-visible \{[^}]*color: #1d4ed8/);
     expect(css).not.toMatch(/\.sidebar-workbench-settings \{[^}]*color: var\(--primary\)/);
+  });
+
+  it('将开机自启动开关置于导出事项下方，并在读取或切换时禁止操作', () => {
+    const props = setup();
+    const exportButton = screen.getByRole('button', { name: '导出事项' });
+    const toggle = screen.getByRole('switch', { name: '开机自启动' });
+    expect(exportButton.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+    expect(props.onToggleAutostart).toHaveBeenCalledTimes(1);
+    cleanup();
+    render(<Sidebar {...props} autostartBusy />);
+    expect((screen.getByRole('switch', { name: '开机自启动' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
