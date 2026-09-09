@@ -4,8 +4,8 @@
 
 | 卡号 | 任务 | 分支 | 状态 |
 | --- | --- | --- | --- |
-| T110 | PM｜冻结 V2.11 需求、基线和插件契约 | integration/v2 | 已完成 |
-| T111 | 开发员｜左侧栏开机自启动开关与 Windows 集成 | codex/v211-autostart-toggle | 待分发 |
+| T110 | PM｜冻结 V2.11 需求、基线和插件契约 | integration/v2 | 已完成（721bb7d） |
+| T111 | 开发员｜左侧栏开机自启动开关与 Windows 集成 | codex/v211-autostart-toggle | 开发中（01a08763） |
 | T112 | 独立测试员｜V2.11 固定集成提交验收 | 待集成后创建 | 待分发 |
 | T113 | PM｜审查、一次集成和用户验收协调 | integration/v2 | 待开始 |
 
