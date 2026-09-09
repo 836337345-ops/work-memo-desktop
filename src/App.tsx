@@ -17,7 +17,7 @@ const dateTitles: Record<DateFilter, string> = { all: '全部事项', today: '�
 
 export default function App() {
   const [items, setItems] = useState<WorkItem[]>([]); const [categories, setCategories] = useState<Category[]>([]);
-  const [filters, setFilters] = useState<FilterState>({ status: 'doing', date: 'all', categoryId: undefined }); const [isTrash, setIsTrash] = useState(false); const [target, setTarget] = useState<EditorTarget>(null); const [showCalendar, setShowCalendar] = useState(false); const [revealItemId, setRevealItemId] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({ status: 'doing', date: 'all', categoryId: undefined }); const [isTrash, setIsTrash] = useState(false); const [target, setTarget] = useState<EditorTarget>(null); const [showCalendar, setShowCalendar] = useState(true); const [revealItemId, setRevealItemId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [showCategories, setShowCategories] = useState(false); const [showBackup, setShowBackup] = useState(false); const [showExport, setShowExport] = useState(false);
   const [workbenchName, setWorkbenchName] = useState(DEFAULT_WORKBENCH_NAME); const [showWorkbenchNameSettings, setShowWorkbenchNameSettings] = useState(false); const [workbenchNameDraft, setWorkbenchNameDraft] = useState(DEFAULT_WORKBENCH_NAME); const [workbenchNameError, setWorkbenchNameError] = useState('');

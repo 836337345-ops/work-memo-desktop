@@ -27,7 +27,7 @@ describe('V2 工作台导航', () => {
 
   it('状态、时间和分类入口均可通过按钮触发', () => {
     const props = setup();
-    fireEvent.click(screen.getByRole('button', { name: '进行中' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '进行中' })[1]);
     fireEvent.click(screen.getByRole('button', { name: /^时间/ }));
     fireEvent.click(screen.getByRole('button', { name: '历史' }));
     fireEvent.click(screen.getByRole('button', { name: /^分类/ }));
@@ -37,17 +37,17 @@ describe('V2 工作台导航', () => {
     expect(props.onCategory).toHaveBeenCalledWith('promotion');
   });
 
-  it('提供醒目的显示全部入口', () => {
+  it('提供醒目的全部入口', () => {
     const props = setup();
-    const button = screen.getByRole('button', { name: '显示全部' });
+    const button = screen.getByRole('button', { name: '全部' });
     expect(button.className).toContain('sidebar-show-all');
     fireEvent.click(button);
     expect(props.onShowAll).toHaveBeenCalledTimes(1);
   });
 
-  it('提供显示进行中工作的快捷入口', () => {
+  it('提供进行中的快捷入口', () => {
     const props = setup();
-    const button = screen.getByRole('button', { name: '显示进行中工作' });
+    const button = document.querySelector('.sidebar-show-doing') as HTMLButtonElement;
     fireEvent.click(button);
     expect(props.onShowDoing).toHaveBeenCalledTimes(1);
   });
@@ -55,11 +55,22 @@ describe('V2 工作台导航', () => {
   it('提供工作日历入口', () => {
     const props = setup();
     const calendar = screen.getByRole('button', { name: '工作日历' });
-    const showAll = screen.getByRole('button', { name: '显示全部' });
-    expect(calendar.compareDocumentPosition(showAll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const doing = document.querySelector('.sidebar-show-doing') as HTMLButtonElement;
+    const showAll = screen.getByRole('button', { name: '全部' });
+    expect(calendar.compareDocumentPosition(doing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(doing.compareDocumentPosition(showAll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(calendar.closest('.sidebar-bottom')).toBeNull();
     fireEvent.click(calendar);
     expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
+  });
+
+  it('筛选组使用双横线箭头，并保留展开状态和可访问属性', () => {
+    setup();
+    const status = screen.getByRole('button', { name: /^状态/ });
+    expect(status.getAttribute('aria-expanded')).toBe('true');
+    expect(status.querySelector('.collapse-icon')).toBeTruthy();
+    fireEvent.click(status);
+    expect(status.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('在侧栏顶部显示可截断的工作台名称和修改入口，并保留日历激活态', () => {

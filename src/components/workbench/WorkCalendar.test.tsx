@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkCalendar } from './WorkCalendar';
 import { holidaysForYear } from './calendar';
+// @ts-expect-error Vitest 在 Node 环境中读取样式契约。
+import { readFileSync } from 'node:fs';
 import type { WorkItem } from '../../types';
 
 const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({ id: 'item-1', title: '今天事项', content: '', categoryId: null, dueDate: '2026-09-07', status: 'doing', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, ...overrides });
@@ -101,6 +103,13 @@ describe('WorkCalendar', () => {
     expect(screen.getByRole('heading', { name: '2026年9月' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '关闭日历' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('周表头与日期数字统一右对齐', () => {
+    const css = readFileSync('src/components/workbench/calendar.css', 'utf8');
+    expect(css).toMatch(/\.work-calendar__weekday \{[^}]*text-align: right/);
+    expect(css).toMatch(/\.work-calendar__date-row \{[^}]*justify-content: flex-end/);
+    expect(css).toMatch(/\.work-calendar__day \{[^}]*padding: 8px 9px/);
   });
 
   it('计算跨年份节日并标红周末与节日日期', () => {

@@ -41,6 +41,10 @@ const dateLinks: Array<{ value: DateFilter; label: string }> = [
   { value: 'nextWeek', label: '下周' }, { value: 'thisMonth', label: '本月' }, { value: 'nextMonth', label: '下月' }, { value: 'history', label: '历史' },
 ];
 
+function CollapseIcon({ expanded }: { expanded: boolean }) {
+  return <svg className="collapse-icon" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 3.5h9M2 7.5h9" /><path d={expanded ? 'm13 10 3-3 3 3' : 'm13 4 3 3-3'} /></svg>;
+}
+
 function readExpanded(): ExpandedState {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as Partial<ExpandedState> | null;
@@ -56,19 +60,19 @@ export function Sidebar({ categories, workbenchName, filters, trash, calendar, o
   return <aside className="sidebar" aria-label="事项导航">
     <div className="brand"><span className="sidebar-workbench-name" title={workbenchName}>{workbenchName}</span><button type="button" className="sidebar-workbench-settings" onClick={onOpenWorkbenchNameSettings}>修改</button></div>
     <button className={calendar ? 'sidebar-calendar active' : 'sidebar-calendar'} onClick={onOpenCalendar}>工作日历</button>
-    <button className="sidebar-show-all" onClick={onShowAll}>显示全部</button>
-    <button className="sidebar-show-doing" onClick={onShowDoing}>显示进行中工作</button>
+    <button className="sidebar-show-doing" onClick={onShowDoing}>进行中</button>
+    <button className="sidebar-show-all" onClick={onShowAll}>全部</button>
     <nav>
       <section className={`sidebar-group sidebar-group-${expanded.status ? 'open' : 'closed'}`}>
-        <button className="sidebar-group-title" aria-expanded={expanded.status} aria-controls="status-filter-group" onClick={() => toggle('status')}><span className="sidebar-group-label">状态{!expanded.status && <small> · {summary.status}</small>}</span><span className="group-chevron" aria-hidden="true">{expanded.status ? '⌃' : '⌄'}</span></button>
+        <button className="sidebar-group-title" aria-expanded={expanded.status} aria-controls="status-filter-group" onClick={() => toggle('status')}><span className="sidebar-group-label">状态{!expanded.status && <small> · {summary.status}</small>}</span><CollapseIcon expanded={expanded.status} /></button>
         {expanded.status && <div id="status-filter-group" className="sidebar-group-options">{statusLinks.map((link) => <button key={link.value} className={!trash && filters.status === link.value ? 'nav-link active' : 'nav-link'} onClick={() => onStatus(link.value)}>{link.label}</button>)}</div>}
       </section>
       <section className={`sidebar-group sidebar-group-${expanded.time ? 'open' : 'closed'}`}>
-        <button className="sidebar-group-title" aria-expanded={expanded.time} aria-controls="date-filter-group" onClick={() => toggle('time')}><span className="sidebar-group-label">时间{!expanded.time && <small> · {summary.time}</small>}</span><span className="group-chevron" aria-hidden="true">{expanded.time ? '⌃' : '⌄'}</span></button>
+        <button className="sidebar-group-title" aria-expanded={expanded.time} aria-controls="date-filter-group" onClick={() => toggle('time')}><span className="sidebar-group-label">时间{!expanded.time && <small> · {summary.time}</small>}</span><CollapseIcon expanded={expanded.time} /></button>
         {expanded.time && <div id="date-filter-group" className="sidebar-group-options">{dateLinks.map((link) => <button key={link.value} className={!trash && filters.date === link.value ? 'nav-link active' : 'nav-link'} onClick={() => onDateFilter(link.value)}>{link.label}</button>)}</div>}
       </section>
       <section className={`sidebar-group sidebar-group-${expanded.category ? 'open' : 'closed'}`}>
-        <div className="sidebar-group-title-wrap"><button className="sidebar-group-title" aria-expanded={expanded.category} aria-controls="category-filter-group" onClick={() => toggle('category')}><span className="sidebar-group-label">分类{!expanded.category && <small> · {summary.category}</small>}</span><span className="group-chevron" aria-hidden="true">{expanded.category ? '⌃' : '⌄'}</span></button><button className="icon-button" onClick={onManageCategories} title="管理分类" aria-label="管理分类">⚙</button></div>
+        <div className="sidebar-group-title-wrap"><button className="sidebar-group-title" aria-expanded={expanded.category} aria-controls="category-filter-group" onClick={() => toggle('category')}><span className="sidebar-group-label">分类{!expanded.category && <small> · {summary.category}</small>}</span><CollapseIcon expanded={expanded.category} /></button><button className="icon-button" onClick={onManageCategories} title="管理分类" aria-label="管理分类">⚙</button></div>
         {expanded.category && <div id="category-filter-group" className="sidebar-group-options"><button className={!trash && filters.categoryId === undefined ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(undefined)}>全部分类</button><button className={!trash && filters.categoryId === null ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(null)}>未分类</button>{categories.map((category) => <button key={category.id} className={!trash && filters.categoryId === category.id ? 'nav-link active' : 'nav-link'} onClick={() => onCategory(category.id)}>{category.name}</button>)}</div>}
       </section>
     </nav>

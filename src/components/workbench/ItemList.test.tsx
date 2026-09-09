@@ -37,11 +37,13 @@ describe('V2.2 可折叠事项卡', () => {
     expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
   });
 
-  it('默认收起仍显示标题栏、类别日期、完整最新进度、状态和详情入口', () => {
+  it('默认收起仍按日期、类别、标题显示首行，并显示完整最新进度、状态和详情入口', () => {
     const next = props();
     render(<ItemList {...next} />);
     expect(screen.getByText('联系客户')).toBeTruthy();
-    expect(screen.getByText('推广 · 2000年1月1日')).toBeTruthy();
+    const copy = document.querySelector('.item-card__header .item-copy') as HTMLElement;
+    expect(copy.textContent).toContain('2000年1月1日｜推广｜联系客户');
+    expect(copy.querySelector('span')?.className).toBe('');
     expect(screen.getByText('完整进度文本不可截断')).toBeTruthy();
     expect(screen.getByLabelText('联系客户的状态')).toBeTruthy();
     expect(screen.getByRole('button', { name: '修改编辑' })).toBeTruthy();
@@ -128,6 +130,23 @@ describe('V2.2 可折叠事项卡', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('本地数据库暂不可写');
     expect((screen.getByLabelText('联系客户的状态') as HTMLSelectElement).value).toBe('paused');
     expect(next.onError).toHaveBeenCalledWith('本地数据库暂不可写');
+  });
+
+  it('新增空跟进不报错；有效内容失败后可重试，成功会清除卡片和页面旧错误', async () => {
+    const next = props();
+    vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('跟进暂不可写')).mockImplementationOnce(async (_id, input) => saved(input));
+    render(<ItemList {...next} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 添加跟进' }));
+    expect(api.updateItem).not.toHaveBeenCalled();
+    const inputs = screen.getAllByLabelText('跟进内容') as HTMLInputElement[];
+    fireEvent.change(inputs[1], { target: { value: '发送会议纪要' } });
+    expect((await screen.findByRole('alert')).textContent).toContain('跟进暂不可写');
+    expect(inputs[1].value).toBe('发送会议纪要');
+    fireEvent.change(inputs[1], { target: { value: '发送会议纪要（已确认）' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(next.onError).toHaveBeenLastCalledWith('');
   });
 
   it('进度失败不会被普通字段保存清掉提示或离开保护', async () => {

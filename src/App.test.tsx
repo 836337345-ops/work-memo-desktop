@@ -62,7 +62,7 @@ describe('App 工作台名称设置', () => {
     expect(await screen.findByText('年度重点')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '回收站' }));
     expect(screen.getByText('年度重点')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
+    fireEvent.click(document.querySelector('.sidebar-show-all') as HTMLButtonElement);
     expect(await screen.findByText('年度重点')).toBeTruthy();
   });
 
@@ -116,14 +116,17 @@ describe('App 工作台名称设置', () => {
 });
 
 describe('App 工作日历入口', () => {
-  it('启动默认显示进行中工作，快捷入口会清除搜索并恢复该筛选', async () => {
+  it('启动默认显示工作日历；快捷入口会返回列表、清除搜索并恢复筛选', async () => {
     render(<App />);
+    const month = new Date();
+    expect(await screen.findByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy();
+    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
     expect(await screen.findByRole('heading', { name: '进行中' })).toBeTruthy();
     const search = screen.getByPlaceholderText('搜索标题、内容、进度、跟进或备注') as HTMLInputElement;
     fireEvent.change(search, { target: { value: '临时关键词' } });
-    fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
+    fireEvent.click(document.querySelector('.sidebar-show-all') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: '显示进行中工作' }));
+    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
     expect(search.value).toBe('');
   });
@@ -136,11 +139,11 @@ describe('App 工作日历入口', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy());
     expect(document.querySelector('.app-shell')?.className).toContain('without-editor');
     expect(screen.getByRole('button', { name: '关闭日历' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '显示全部' }));
+    fireEvent.click(document.querySelector('.sidebar-show-all') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy());
-    fireEvent.click(screen.getByRole('button', { name: '显示进行中工作' }));
+    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
   });
 
