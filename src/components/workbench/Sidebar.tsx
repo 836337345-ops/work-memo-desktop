@@ -42,7 +42,7 @@ const dateLinks: Array<{ value: DateFilter; label: string }> = [
 ];
 
 function CollapseIcon({ expanded }: { expanded: boolean }) {
-  return <svg className="collapse-icon" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 3.5h9M2 7.5h9" /><path d={expanded ? 'm13 10 3-3 3 3' : 'm13 4 3 3-3'} /></svg>;
+  return <svg className="collapse-icon" viewBox="0 0 18 18" data-direction={expanded ? 'up' : 'down'} aria-hidden="true"><path d="M4 3.5h10M4 7.5h10" /><path d={expanded ? 'm5 15 4-4 4 4' : 'm5 11 4 4 4-4'} /></svg>;
 }
 
 function readExpanded(): ExpandedState {

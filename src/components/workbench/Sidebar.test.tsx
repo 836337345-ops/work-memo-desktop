@@ -64,13 +64,19 @@ describe('V2 工作台导航', () => {
     expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
   });
 
-  it('筛选组使用双横线箭头，并保留展开状态和可访问属性', () => {
+  it('筛选组使用上下结构的双横线箭头，并保留展开状态和可访问属性', () => {
     setup();
     const status = screen.getByRole('button', { name: /^状态/ });
     expect(status.getAttribute('aria-expanded')).toBe('true');
-    expect(status.querySelector('.collapse-icon')).toBeTruthy();
+    const icon = status.querySelector('.collapse-icon') as SVGElement;
+    expect(icon.getAttribute('data-direction')).toBe('up');
+    expect(icon.querySelectorAll('path')).toHaveLength(2);
+    const expandedArrow = icon.querySelectorAll('path')[1].getAttribute('d');
     fireEvent.click(status);
     expect(status.getAttribute('aria-expanded')).toBe('false');
+    const collapsedIcon = status.querySelector('.collapse-icon') as SVGElement;
+    expect(collapsedIcon.getAttribute('data-direction')).toBe('down');
+    expect(collapsedIcon.querySelectorAll('path')[1].getAttribute('d')).not.toBe(expandedArrow);
   });
 
   it('在侧栏顶部显示可截断的工作台名称和修改入口，并保留日历激活态', () => {

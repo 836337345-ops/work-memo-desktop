@@ -35,6 +35,7 @@ describe('V2.2 可折叠事项卡', () => {
     cleanup();
     expect(() => render(<ItemList {...next} revealItemId="missing" />)).not.toThrow();
     expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
+    expect(document.querySelector('.item-card__collapse-icon')?.getAttribute('data-direction')).toBe('down');
   });
 
   it('默认收起仍按日期、类别、标题显示首行，并显示完整最新进度、状态和详情入口', () => {
@@ -42,7 +43,7 @@ describe('V2.2 可折叠事项卡', () => {
     render(<ItemList {...next} />);
     expect(screen.getByText('联系客户')).toBeTruthy();
     const copy = document.querySelector('.item-card__header .item-copy') as HTMLElement;
-    expect(copy.textContent).toContain('2000年1月1日｜推广｜联系客户');
+    expect(copy.textContent).toContain('2000年1月1日 | 推广 | 联系客户');
     expect(copy.querySelector('span')?.className).toBe('');
     expect(screen.getByText('完整进度文本不可截断')).toBeTruthy();
     expect(screen.getByLabelText('联系客户的状态')).toBeTruthy();
@@ -129,7 +130,7 @@ describe('V2.2 可折叠事项卡', () => {
     fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'paused' } });
     expect((await screen.findByRole('alert')).textContent).toContain('本地数据库暂不可写');
     expect((screen.getByLabelText('联系客户的状态') as HTMLSelectElement).value).toBe('paused');
-    expect(next.onError).toHaveBeenCalledWith('本地数据库暂不可写');
+    expect(next.onError).toHaveBeenCalledWith('本地数据库暂不可写', 'normal');
   });
 
   it('新增空跟进不报错；有效内容失败后可重试，成功会清除卡片和页面旧错误', async () => {
@@ -146,27 +147,41 @@ describe('V2.2 可折叠事项卡', () => {
     fireEvent.change(inputs[1], { target: { value: '发送会议纪要（已确认）' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-    expect(next.onError).toHaveBeenLastCalledWith('');
+    expect(next.onError).toHaveBeenLastCalledWith('', 'normal');
+  });
+
+  it('空白跟进不会随状态更新提交，输入空格也不会触发保存失败', async () => {
+    render(<ItemList {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 添加跟进' }));
+    const inputs = screen.getAllByLabelText('跟进内容') as HTMLInputElement[];
+    fireEvent.change(inputs[1], { target: { value: '   ' } });
+    expect(api.updateItem).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'paused' } });
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
+    const [, savedInput] = vi.mocked(api.updateItem).mock.calls[0];
+    expect(savedInput.followUps).toEqual([{ id: 'f1', text: '确认联系人', done: false }]);
   });
 
   it('进度失败不会被普通字段保存清掉提示或离开保护', async () => {
     vi.mocked(api.addProgress).mockRejectedValueOnce(new Error('进度写入失败'));
     const ref = createRef<ItemListHandle>();
-    render(<ItemList {...props()} ref={ref} />);
+    const next = props();
+    render(<ItemList {...next} ref={ref} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
     fireEvent.click(screen.getByText('最新进度'));
     fireEvent.change(screen.getByLabelText('新增进度'), { target: { value: '等待确认' } });
     fireEvent.click(screen.getByRole('button', { name: '提交新进度' }));
     expect((await screen.findByRole('alert')).textContent).toContain('进度写入失败');
-    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'doing' } });
+    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'paused' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalled());
     expect(screen.getByRole('alert').textContent).toContain('进度写入失败');
+    expect(next.onError).not.toHaveBeenCalledWith('', 'normal');
     expect(await ref.current?.prepareLeave()).toBe(false);
   });
 
   it('状态操作和跟进仍可内联保存，回收站卡片只读', async () => {
     render(<ItemList {...props()} />);
-    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'doing' } });
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
     fireEvent.click(screen.getByLabelText('完成：确认联系人'));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.status === 'doing' && input.followUps[0].done)).toBe(true));
@@ -183,14 +198,14 @@ describe('V2.2 可折叠事项卡', () => {
     vi.mocked(api.updateItem).mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveSave = resolve; }));
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
-    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'doing' } });
+    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'paused' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
     const leave = ref.current?.prepareLeave();
-    resolveSave(saved({ ...base, status: 'doing' }));
+    resolveSave(saved({ ...base, status: 'paused' }));
     expect(await leave).toBe(true);
 
     vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('保存失败'));
-    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'paused' } });
+    fireEvent.change(screen.getByLabelText('联系客户的状态'), { target: { value: 'done' } });
     await screen.findByRole('alert');
     expect(await ref.current?.prepareLeave()).toBe(false);
   });
@@ -204,17 +219,17 @@ describe('V2.2 可折叠事项卡', () => {
     const ref = createRef<ItemListHandle>();
     render(<ItemList {...props()} ref={ref} />);
     const status = screen.getByLabelText('联系客户的状态');
-    fireEvent.change(status, { target: { value: 'doing' } });
+    fireEvent.change(status, { target: { value: 'paused' } });
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(1));
     const leave = ref.current?.prepareLeave();
     let settled = false;
     void leave?.then(() => { settled = true; });
-    fireEvent.change(status, { target: { value: 'paused' } });
-    resolveA(saved({ ...base, status: 'doing' }));
+    fireEvent.change(status, { target: { value: 'done' } });
+    resolveA(saved({ ...base, status: 'paused' }));
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     await Promise.resolve();
     expect(settled).toBe(false);
-    resolveB(saved({ ...base, status: 'paused' }));
+    resolveB(saved({ ...base, status: 'done' }));
     expect(await leave).toBe(true);
   });
 

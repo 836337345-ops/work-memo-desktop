@@ -11,7 +11,7 @@ interface ItemListProps {
   selectedId: string | null;
   onSelect: (item: WorkItem) => void;
   onChanged?: (item: WorkItem) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, kind: 'normal' | 'progress') => void;
   onRestore?: (item: WorkItem) => void;
   editingItemId?: string | null;
   revealItemId?: string | null;
@@ -20,17 +20,18 @@ interface ItemListProps {
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
 const newFollowUp = (): FollowUp => ({ id: globalThis.crypto?.randomUUID?.() ?? `follow-${Date.now()}-${Math.random().toString(16).slice(2)}`, text: '', done: false });
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : '保存失败，请重试。';
-const hasOnlyEmptyFollowUpChange = (next: ItemInput, previous: ItemInput) => next.followUps.length > previous.followUps.length && next.followUps.slice(previous.followUps.length).every((entry) => !entry.text.trim());
+const forSaving = (input: ItemInput): ItemInput => ({ ...input, followUps: input.followUps.filter((entry) => entry.text.trim()) });
+const hasOnlyNonPersistedChange = (next: ItemInput, previous: ItemInput) => JSON.stringify(forSaving(next)) === JSON.stringify(forSaving(previous));
 
 function CollapseIcon({ expanded }: { expanded: boolean }) {
-  return <svg className="item-card__collapse-icon" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 3.5h9M2 7.5h9" /><path d={expanded ? 'm13 10 3-3 3 3' : 'm13 4 3 3-3'} /></svg>;
+  return <svg className="item-card__collapse-icon" viewBox="0 0 18 18" data-direction={expanded ? 'up' : 'down'} aria-hidden="true"><path d="M4 3.5h10M4 7.5h10" /><path d={expanded ? 'm5 15 4-4 4 4' : 'm5 11 4 4 4-4'} /></svg>;
 }
 
 interface CardHandle { prepareLeave: () => Promise<boolean> }
 
 function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister, onElementRegister, revealed = false, revealVersion = 0 }: {
   item: WorkItem; categoryName: string; selected: boolean; readOnly: boolean; onSelect: () => void;
-  onChanged?: (item: WorkItem) => void; onError?: (message: string) => void; onRestore?: () => void; onRegister: (handle: CardHandle | null) => void;
+  onChanged?: (item: WorkItem) => void; onError?: (message: string, kind: 'normal' | 'progress') => void; onRestore?: () => void; onRegister: (handle: CardHandle | null) => void;
   onElementRegister: (element: HTMLElement | null) => void; revealed?: boolean; revealVersion?: number;
 }) {
   const [draft, setDraft] = useState<ItemInput>(() => toInput(item));
@@ -77,31 +78,31 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     else progressFailedRef.current = true;
     if (kind === 'normal') setNormalError(message);
     else setProgressError(message);
-    onError?.(message);
+    onError?.(message, kind);
   };
 
   const enqueueUpdate = (next: ItemInput) => {
     const previous = draftRef.current;
     draftRef.current = next;
     setDraft(next);
-    if (hasOnlyEmptyFollowUpChange(next, previous)) return;
+    if (hasOnlyNonPersistedChange(next, previous)) return;
     if (!next.title.trim()) {
       const message = '事项标题不能为空。';
       normalFailedRef.current = true;
       setNormalError(message);
-      onError?.(message);
+      onError?.(message, 'normal');
       return;
     }
-    normalFailedRef.current = false;
-    setNormalError(null);
+    const input = forSaving(next);
     setSaving((count) => count + 1);
     const save = async () => {
       try {
-        const saved = await api.updateItem(item.id, next);
+        const saved = await api.updateItem(item.id, input);
         ownUpdateAtRef.current = saved.updatedAt;
+        const clearsPreviousNormalFailure = normalFailedRef.current;
         normalFailedRef.current = false;
         setNormalError(null);
-        onError?.('');
+        if (clearsPreviousNormalFailure) onError?.('', 'normal');
         onChanged?.(saved);
       } catch (reason) {
         reportFailure(reason, 'normal');
@@ -161,7 +162,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />
-        <div className="item-copy"><span>{formatChineseDate(item.dueDate)}</span><i aria-hidden="true">｜</i><span>{categoryName}</span><i aria-hidden="true">｜</i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
+        <div className="item-copy"><span>{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span>{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
         {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>
