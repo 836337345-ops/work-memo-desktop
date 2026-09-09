@@ -1,8 +1,8 @@
 # V2.10 独立验收报告
 
-验收日期：2026 年 9 月 10 日  
-验收人：独立测试员  
-被测提交：`d43eabee5fa4cfc7bb517ef6d9d01c12568dcc7c`（`fix: harden item follow-up saves`）  
+验收日期：2026 年 9 月 10 日
+验收人：独立测试员
+被测提交：`d43eabee5fa4cfc7bb517ef6d9d01c12568dcc7c`（`fix: harden item follow-up saves`）
 验收分支：`codex/v210-independent-qa`
 
 ## 数据边界
