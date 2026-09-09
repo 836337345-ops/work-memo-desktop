@@ -162,7 +162,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
         <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />
-        <div className="item-copy"><span>{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span>{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
+        <div className="item-copy"><span className="item-card__date">{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span className="item-card__category">{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
         {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
       </header>

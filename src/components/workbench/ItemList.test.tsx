@@ -2,6 +2,8 @@
 import { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error Node 类型并非前端生产依赖；Vitest 在 Node 环境中读取样式契约。
+import { readFileSync } from 'node:fs';
 import { api } from '../../api';
 import { ItemList } from './ItemList';
 import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
@@ -38,19 +40,28 @@ describe('V2.2 可折叠事项卡', () => {
     expect(document.querySelector('.item-card__collapse-icon')?.getAttribute('data-direction')).toBe('down');
   });
 
-  it('默认收起仍按日期、类别、标题显示首行，并显示完整最新进度、状态和详情入口', () => {
+  it('默认收起仍将日期、类别和标题固定在首行，标题可省略且控件继续可见', () => {
     const next = props();
     render(<ItemList {...next} />);
     expect(screen.getByText('联系客户')).toBeTruthy();
     const copy = document.querySelector('.item-card__header .item-copy') as HTMLElement;
     expect(copy.textContent).toContain('2000年1月1日 | 推广 | 联系客户');
-    expect(copy.querySelector('span')?.className).toBe('');
+    expect(copy.children[0].classList.contains('item-card__date')).toBe(true);
+    expect(copy.children[1].textContent).toBe(' | ');
+    expect(copy.children[2].classList.contains('item-card__category')).toBe(true);
     expect(screen.getByText('完整进度文本不可截断')).toBeTruthy();
     expect(screen.getByLabelText('联系客户的状态')).toBeTruthy();
     expect(screen.getByRole('button', { name: '修改编辑' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
     expect(screen.getByText('逾期')).toBeTruthy();
     expect(screen.queryByText('确认本周合作方案')).toBeNull();
+  });
+
+  it('首行布局禁止换行，并只允许长标题在单行内省略', () => {
+    const css = readFileSync('src/components/workbench/item-card.css', 'utf8');
+    expect(css).toMatch(/\.item-list \.item-card__header \{[^}]*flex-wrap: nowrap/);
+    expect(css).toMatch(/\.item-list \.item-card__header \.item-copy \{[^}]*grid-template-columns: max-content max-content max-content max-content minmax\(0, 1fr\)[^}]*white-space: nowrap/);
+    expect(css).toMatch(/\.item-list \.item-card__header \.item-copy strong \{[^}]*min-width: 0[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/);
   });
 
   it('最新进度正文保留原有换行', () => {

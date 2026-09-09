@@ -64,11 +64,13 @@ describe('V2 工作台导航', () => {
     expect(props.onOpenCalendar).toHaveBeenCalledTimes(1);
   });
 
-  it('筛选组使用上下结构的双横线箭头，并保留展开状态和可访问属性', () => {
+  it('筛选组将双横线箭头置于标题文字前，并保留展开状态和可访问属性', () => {
     setup();
     const status = screen.getByRole('button', { name: /^状态/ });
     expect(status.getAttribute('aria-expanded')).toBe('true');
     const icon = status.querySelector('.collapse-icon') as SVGElement;
+    expect(status.firstElementChild).toBe(icon);
+    expect(status.children[1].classList.contains('sidebar-group-label')).toBe(true);
     expect(icon.getAttribute('data-direction')).toBe('up');
     expect(icon.querySelectorAll('path')).toHaveLength(2);
     const expandedArrow = icon.querySelectorAll('path')[1].getAttribute('d');
