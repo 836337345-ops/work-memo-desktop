@@ -1,11 +1,13 @@
 # 工作备忘录项目总交接
 
-更新日期：2026年9月9日
+更新日期：2026年9月10日
+
+> 本文件只记录长期产品事实和稳定执行边界。当前版本、阶段、固定提交、任务状态和唯一下一步以 `docs/ACTIVE-VERSION.md` 为准；历史任务详情以任务卡、QA 报告和版本交接文件为准。
 
 ## 一、当前基线
 
-- 项目目录：`D:/CODEX项目/工作备忘录`；当前产品阶段为 V2.9，内部版本号为 `0.1.0`。
-- 当前分支、任务和安装包状态见 `docs/ACTIVE-VERSION.md`；V2.9 提交、测试、哈希和任务记录见 `docs/HANDOFF-V2.9.md` 与 `docs/QA-V2.9.md`。
+- 项目目录：`D:/CODEX项目/工作备忘录`；当前分支、任务、版本和安装包状态只见 `docs/ACTIVE-VERSION.md`。
+- 历史提交、测试、哈希和任务记录见对应的 `HANDOFF-版本号.md`、任务卡与 QA 报告。
 
 ## 二、产品与界面
 
@@ -79,10 +81,10 @@
 
 ## 十、接管与执行边界
 
-- 当前状态以 `docs/ACTIVE-VERSION.md` 为准；协作规则以 `AGENTS.md` 为准；Sol PM 防复发规则见 `docs/HANDOFF-SOL-USAGE-20260909.json`。
-- V2.9 验收已通过，证据见 `docs/HANDOFF-V2.9.md` 与 `docs/QA-V2.9.md`。
+- 当前状态以 `docs/ACTIVE-VERSION.md` 为准；协作规则以 `AGENTS.md` 与 `docs/PROJECT-COLLABORATION.md` 为准；Sol PM 防复发规则见 `docs/HANDOFF-SOL-USAGE-20260909.json`。
+- 新 PM 只按当前任务需要读取历史版本材料，不恢复完整聊天或把历史版本状态抄入本文件。
 - 旧工作树 `C:/Users/Administrator/.codex/worktrees/f042/工作备忘录` 有未提交修改，必须保留。新工作树先运行 `scripts/setup-codex-worktree.ps1` 以复用依赖和 Rust 缓存。
-- 新任务只有在正式任务 ID、工作树、分支、基线、依赖和第一条实际进度均已核对并登记后，才可报告“已启动”。
+- 新任务只有在正式任务 ID、工作树、分支、基线、依赖和第一条实际进度均已核对并登记后，才可报告“已启动”。创建后暂未读取到 ID 时，应先等待一次并重新读取同一任务；恢复环境后续用原任务与工作树，不重复创建。
 
 ## 十一、第三任 PM 提示词
 

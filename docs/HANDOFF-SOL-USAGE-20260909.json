@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "documentType": "sol_usage_audit_handoff",
-  "generatedAt": "2026-09-09",
+  "generatedAt": "2026-09-10",
   "project": "工作备忘录",
   "purpose": "记录本项目 Sol 用量异常偏高的已核查原因、证据边界与后续协作建议，供下一任项目总 PM 接管时执行。",
   "scope": {
@@ -19,13 +19,15 @@
         "role": "当前 PM；不可能造成截图中 9 月 6、7 日的 Sol 用量"
       }
     ],
-    "notInScope": [
-      "无法从个人用量图精确换算到单个线程、单条命令或单次模型回复的实际额度。",
-      "截图按日期和模型汇总全账户 Work、Codex 与其他代理活动，不按项目或任务窗口归属。",
-      "开发员与测试员的 Terra 消耗不归入本 Sol PM 审计。"
+  "notInScope": [
+    "无法从个人用量图精确换算到单个线程、单条命令或单次模型回复的实际额度。",
+    "截图按日期和模型汇总全账户 Work、Codex 与其他代理活动，不按项目或任务窗口归属。",
+    "开发员与测试员的 Terra 消耗不归入本 Sol PM 审计。",
+    "程序前台运行时长不能直接换算为额度消耗；额度还受模型、上下文、推理、工具调用与检索影响。",
+    "截图中 9 月 6 至 7 日的 Sol 高峰发生在第三任 PM 创建前，不能归因给第三任 PM。"
     ]
   },
-  "verifiedConclusion": "Sol 消耗偏高的主因不是一次正常的项目集成，而是旧 PM 将长时间运行的调试程序、重复的 PM 级测试、频繁轮询、重复文档与 Git 检查、任务登记故障恢复和重复可见任务复核混合在同一批 Sol 长回合中。",
+  "verifiedConclusion": "Sol 消耗偏高的可证实主因是旧 PM 的高频 Git、差异、文档和任务状态检查，以及重复测试、轮询和故障恢复混入长回合。第三任 PM 的 12 个 Sol 回合实际使用 High 或 Extra High，也未落实项目规定的 Sol Light 默认、Medium 例外。调试程序长时间前台运行是应避免的工作方式，但不能仅凭运行时长断言其额度占比。",
   "evidence": {
     "oldPmAggregateInvocationCounts": {
       "gitStatusOrLog": 206,
