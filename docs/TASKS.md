@@ -11,7 +11,7 @@
 | T124 | 原开发员｜V2.12 验收反馈修复 | codex/v212-calendar-star-followup | 已交付（9341722、c57db9a），待 PM 集成 |
 | T125 | 独立测试员｜V2.12 验收修复固定提交验收 | codex/v212-independent-qa | 旧窗口口径冲突，已停止并保留报告 |
 | T126 | 全新独立测试员｜V2.12 当前契约复验 | 独立工作树 186e | 已通过（474726e，集成 562f5b1） |
-| T127 | 原开发员｜V2.12 第二轮验收修复 | codex/v212-calendar-star-followup | 需求已确认，待续派 |
+| T127 | 原开发员｜V2.12 第二轮验收修复 | codex/v212-calendar-star-followup | 已交付（ed7e126），待 PM 集成 |
 
 任务卡见 `docs/TASK-V2.12.md`。本轮不生成安装包、不修改 `main`、不上传或发布；用户调试验收通过后仍需另行明确授权打包。
 
