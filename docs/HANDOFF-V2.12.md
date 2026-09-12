@@ -25,4 +25,4 @@
 
 ## Git 交付
 
-- `main` 与 `integration/v2` 已同步至远程 `origin`，发布记录提交为 `097f57b52b170565c9fa1e583b36306870f21534`。
+- `main` 与 `integration/v2` 已同步至远程 `origin`，保持同一交付版本。
