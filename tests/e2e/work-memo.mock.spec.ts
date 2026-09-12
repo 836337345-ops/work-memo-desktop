@@ -171,7 +171,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await expect(statusGroup).toHaveAttribute('aria-expanded', 'true');
     await expect(timeGroup).toHaveAttribute('aria-expanded', 'true');
     await expect(categoryGroup).toHaveAttribute('aria-expanded', 'true');
-    await page.getByRole('button', { name: '进行中', exact: true }).click();
+    await page.locator('#status-filter-group').getByRole('button', { name: '进行中', exact: true }).click();
     await page.getByRole('button', { name: '下周', exact: true }).click();
     await page.getByRole('button', { name: '推广', exact: true }).click();
     await expect(page.getByText('样板间开放推广', { exact: true })).toBeVisible();

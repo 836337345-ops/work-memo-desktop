@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
 import { formatChineseDate } from '../../lib/dateFormat';
 import { isOverdue } from '../../lib/filters';
@@ -133,7 +134,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   };
   const prepareFollowUps = async () => {
     if (!followUpsDirty()) return true;
-    if (window.confirm('跟进清单修改未保存，是否保存？')) return saveFollowUps();
+    if (await confirm('跟进清单修改未保存，是否保存？', { title: '未保存的跟进清单', okLabel: '保存', cancelLabel: '不保存' })) return saveFollowUps();
     const next = { ...draftRef.current, followUps: savedFollowUpsRef.current.map((entry) => ({ ...entry })) };
     draftRef.current = next; setDraft(next); return true;
   };

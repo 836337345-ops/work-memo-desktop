@@ -33,8 +33,13 @@ describe('V2.8 ItemEditor', () => {
 
   it('新建和已有事项统一使用顶部保存并关闭按钮，成功后关闭编辑栏', async () => {
     const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [], isStarred: false }; vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
-    render(<ItemEditor {...props} item={null} />); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
+    render(<ItemEditor {...props} item={null} />); expect(screen.getByRole('button', { name: '取消' })).toBeTruthy(); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     await waitFor(() => expect(api.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: '新事项', status: 'doing' }))); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
+  });
+
+  it('已有事项不显示取消按钮', () => {
+    render(<ItemEditor {...props} />);
+    expect(screen.queryByRole('button', { name: '取消' })).toBeNull();
   });
 
   it('新建草稿预填默认截止日期，已有事项始终使用自身日期', () => {
