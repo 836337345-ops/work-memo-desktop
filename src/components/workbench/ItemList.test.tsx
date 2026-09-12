@@ -273,6 +273,19 @@ describe('V2.2 可折叠事项卡', () => {
     expect(next.onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 'one', deletedAt: expect.any(String) }));
   });
 
+  it('删除前自动保存失败会阻断原生确认和软删除', async () => {
+    vi.mocked(api.updateItem).mockRejectedValueOnce(new Error('跟进暂不可写'));
+    const next = props();
+    render(<ItemList {...next} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '删除前仍需保留的跟进' } });
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('跟进暂不可写');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(api.trashItem).not.toHaveBeenCalled();
+    expect(next.onChanged).not.toHaveBeenCalledWith(expect.objectContaining({ deletedAt: expect.any(String) }));
+  });
+
   it('离开保护等待当前内联保存并在失败时阻止卸载', async () => {
     let resolveSave!: (item: WorkItem) => void;
     vi.mocked(api.updateItem).mockImplementationOnce(() => new Promise<WorkItem>((resolve) => { resolveSave = resolve; }));
