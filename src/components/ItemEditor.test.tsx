@@ -40,6 +40,7 @@ describe('V2.8 ItemEditor', () => {
   it('已有事项不显示取消按钮', () => {
     render(<ItemEditor {...props} />);
     expect(screen.queryByRole('button', { name: '取消' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: '重要事项' })).toBeNull();
   });
 
   it('新建草稿预填默认截止日期，已有事项始终使用自身日期', () => {
@@ -131,12 +132,13 @@ describe('V2.8 ItemEditor', () => {
   });
 
   it('保存时清除空白跟进，并写入重要事项标记', async () => {
-    vi.mocked(api.updateItem).mockImplementation(async (_id, input) => savedItem(input));
-    render(<ItemEditor {...props} />);
+    vi.mocked(api.createItem).mockImplementation(async (input) => savedItem(input));
+    render(<ItemEditor {...props} item={null} />);
+    fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '带星标的新事项' } });
     fireEvent.click(screen.getByRole('checkbox', { name: '重要事项' }));
     fireEvent.click(screen.getByRole('button', { name: '＋ 添加清单' }));
     fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '   ' } });
     fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
-    await waitFor(() => expect(api.updateItem).toHaveBeenCalledWith('item-1', expect.objectContaining({ isStarred: true, followUps: [] })));
+    await waitFor(() => expect(api.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: '带星标的新事项', isStarred: true, followUps: [] })));
   });
 });
