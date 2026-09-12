@@ -191,6 +191,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
   });
 
   test('事项卡默认收起，点击最新进度标题才出现输入；提交成功保持当前展开状态', async ({ page }) => {
+    await page.locator('.sidebar-show-doing').click();
     const card = page.getByRole('article', { name: '事项：样板间开放推广' });
     await expect(card.getByRole('button', { name: '展开事项' })).toBeVisible();
     await expect(card.locator('.item-card__progress-full')).toContainText('已收集三家渠道的物料清单。');
@@ -222,7 +223,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
         situationRadius: Number.parseFloat(situationStyle.borderRadius),
         progress: [fontSize('.item-card__progress b'), fontSize('.item-card__progress-full')],
         situation: [fontSize('.item-card__situation b'), fontSize('.item-card__situation span')],
-        followUps: [fontSize('section[aria-label="跟进清单"] > b'), fontSize('section[aria-label="跟进清单"] input:not([type="checkbox"])')],
+        followUps: [fontSize('.item-card__follow-up-heading > b'), fontSize('section[aria-label="跟进清单"] input:not([type="checkbox"])')],
         notes: [fontSize('.item-card__notes b'), fontSize('.item-card__notes span')],
       };
     });
@@ -343,6 +344,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
   });
 
   test('编辑器默认隐藏，仅新建或修改编辑打开；普通字段不自动写入且保存失败保留输入', async ({ page }) => {
+    await page.locator('.sidebar-show-doing').click();
     await expect(page.locator('.editor-pane')).not.toBeVisible();
     await page.getByRole('button', { name: '＋ 新建事项' }).click();
     const editor = page.getByRole('region', { name: '事项编辑器' });
@@ -352,13 +354,14 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await editor.getByLabel(/事项标题/).fill('只在点击保存时写入');
     const afterTyping = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => ['create_item', 'update_item'].includes(call.command)).length);
     expect(afterTyping).toBe(before);
-    await editor.getByRole('button', { name: '创建并关闭' }).click();
+    await editor.getByRole('button', { name: '保存并关闭' }).click();
     await expect(editor).not.toBeVisible();
     await page.getByRole('article', { name: '事项：只在点击保存时写入' }).getByRole('button', { name: '修改编辑' }).click();
     await expect(page.getByRole('region', { name: '事项编辑器' })).toBeVisible();
 
     await mockIpc(page, { ...seed, failures: { update_item: '保存失败：编辑器测试' } });
     await page.reload();
+    await page.locator('.sidebar-show-doing').click();
     await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
     const failedEditor = page.getByRole('region', { name: '事项编辑器' });
     const title = failedEditor.getByLabel(/事项标题/);
@@ -437,7 +440,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await calendar.getByRole('button', { name: '回到今天' }).click();
     await expect(calendar.getByRole('heading', { name: '2026年9月' })).toBeVisible();
     await calendar.getByRole('button', { name: '关闭日历' }).click();
-    await expect(page.getByRole('heading', { name: '全部事项' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '进行中' })).toBeVisible();
   });
 
   test('V2.4 日历不受列表条件影响，显示三种状态颜色和可聚焦的完整当日标题', async ({ page }) => {
