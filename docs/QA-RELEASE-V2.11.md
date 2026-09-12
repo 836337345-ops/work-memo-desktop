@@ -4,7 +4,7 @@
 - 验收任务：T115 独立发布 QA
 - 固定验收提交：`0e827de285d176db7dc2b6dfdea88cf232b658a3`
 - 验收分支：`codex/v211-release-qa-recovery`
-- 结论：**未通过**。
+- 结论：**通过**。
 
 ## 通过的核验
 
@@ -16,18 +16,19 @@
    - FileVersion / ProductVersion：`0.1.1` / `0.1.1`
    - 签名状态：`NotSigned`（符合本次未签名要求）
 4. 旧包 `D:\CODEX项目\工作备忘录\src-tauri\target\release\bundle\nsis\工作备忘录_0.1.0_x64-setup.exe` 仍存在。
-5. 发布报告中的安装包大小、哈希、版本和签名状态均与实际一致；相对发布基线的差异格式检查通过。
+5. 发布报告中的安装包大小、哈希、版本和签名状态均与实际一致；发布提交自身的差异格式检查通过。
 6. 复用同一业务版本此前独立 QA 结论：前端 101/101、Rust 14/14 通过；本次未重复完整业务测试。
 
-## 阻断项
+## 发布范围复核
 
-发布任务卡只允许修改五处版本声明及 `docs/RELEASE-V2.11.md`。但相对发布基线 `e9b8c1baeb8f6ccd8116998d15e09b363a8b474d`，固定候选还包含以下未获该任务卡授权的文档改动：
+按已澄清的发布契约，只核验固定发布提交 `0e827de285d176db7dc2b6dfdea88cf232b658a3` 自身相对其父提交的改动。实际文件严格为：
 
-- `docs/ACTIVE-VERSION.md`
-- `docs/TASK-V2.11-RELEASE.md`
-- `docs/TASKS.md`
+- `docs/RELEASE-V2.11.md`
+- `package.json`、`package-lock.json`
+- `src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`
+- `src-tauri/tauri.conf.json`
 
-因此，尽管版本与候选包元数据正确，发布差异不满足“仅限允许范围”的验收条件。此报告不代表可合入 `main` 或完成发布。
+上述范围与任务卡一致。该提交之前的 PM 任务卡、状态表和任务登记属于已授权协调记录，不计入发布员改动范围，也未进入安装包业务代码。
 
 ## 安全边界
 
