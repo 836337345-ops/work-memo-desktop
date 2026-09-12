@@ -9,7 +9,7 @@
 | T112 | 独立测试员｜V2.11 固定集成提交验收 | codex/v211-independent-qa | 已通过（101/101、Rust 14/14，报告 40b07d5） |
 | T113 | PM｜审查、一次集成和用户验收协调 | integration/v2 | 用户确认通过，已取得打包授权 |
 | T114 | 发布员｜版本更新与 Windows 0.1.1 安装包 | codex/v211-release-011 | 已完成并集成（0e827de） |
-| T115 | 独立测试员｜0.1.1 安装包发布验收 | codex/v211-release-qa-recovery | 首轮口径退回，同一测试员复核（01a0876c） |
+| T115 | 独立测试员｜0.1.1 安装包发布验收 | codex/v211-release-qa-recovery | 已通过（d9ac437，集成 7c8e119） |
 
 功能任务卡见 `docs/TASK-V2.11.md`，发布任务卡见 `docs/TASK-V2.11-RELEASE.md`。用户已确认通过并授权生成 `0.1.1` 安装包及合入 `main`；仍不得上传、远程推送、自动安装或删除旧包。
 
