@@ -17,7 +17,7 @@ interface ItemListProps {
   revealItemId?: string | null;
 }
 
-const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
+const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })), isStarred: item.isStarred });
 const newFollowUp = (): FollowUp => ({ id: globalThis.crypto?.randomUUID?.() ?? `follow-${Date.now()}-${Math.random().toString(16).slice(2)}`, text: '', done: false });
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : '保存失败，请重试。';
 const forSaving = (input: ItemInput): ItemInput => ({ ...input, followUps: input.followUps.filter((entry) => entry.text.trim()) });
@@ -44,6 +44,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   const [normalError, setNormalError] = useState<string | null>(null);
   const [progressError, setProgressError] = useState<string | null>(null);
   const draftRef = useRef(draft);
+  const savedFollowUpsRef = useRef(draft.followUps);
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
   const progressChainRef = useRef<Promise<void>>(Promise.resolve());
   const progressTextRef = useRef(progressText);
@@ -60,6 +61,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     const next = toInput(item);
     setDraft(next);
     draftRef.current = next;
+    savedFollowUpsRef.current = next.followUps;
     setProgress(item.progress);
     setProgressText('');
     setProgressInputVisible(false);
@@ -93,7 +95,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
       onError?.(message, 'normal');
       return;
     }
-    const input = forSaving(next);
+    const input = { ...forSaving(next), followUps: savedFollowUpsRef.current };
     setSaving((count) => count + 1);
     const save = async () => {
       try {
@@ -114,7 +116,27 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   };
 
   const update = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => enqueueUpdate({ ...draftRef.current, [field]: value });
-  const updateFollowUps = (followUps: FollowUp[]) => update('followUps', followUps);
+  const updateFollowUps = (followUps: FollowUp[]) => { const next = { ...draftRef.current, followUps }; draftRef.current = next; setDraft(next); setNormalError(null); };
+  const followUpsDirty = () => JSON.stringify(draftRef.current.followUps) !== JSON.stringify(savedFollowUpsRef.current);
+  const saveFollowUps = async () => {
+    if (!followUpsDirty()) return true;
+    if (!draftRef.current.title.trim()) { setNormalError('事项标题不能为空。'); return false; }
+    setSaving((count) => count + 1);
+    try {
+      const saved = await api.updateItem(item.id, forSaving(draftRef.current));
+      ownUpdateAtRef.current = saved.updatedAt;
+      const next = toInput(saved); draftRef.current = next; setDraft(next); savedFollowUpsRef.current = next.followUps;
+      const clearsPreviousNormalFailure = normalFailedRef.current;
+      normalFailedRef.current = false; setNormalError(null); if (clearsPreviousNormalFailure) onError?.('', 'normal'); onChanged?.(saved); return true;
+    } catch (reason) { reportFailure(reason, 'normal'); return false; }
+    finally { setSaving((count) => Math.max(0, count - 1)); }
+  };
+  const prepareFollowUps = async () => {
+    if (!followUpsDirty()) return true;
+    if (window.confirm('跟进清单修改未保存，是否保存？')) return saveFollowUps();
+    const next = { ...draftRef.current, followUps: savedFollowUpsRef.current.map((entry) => ({ ...entry })) };
+    draftRef.current = next; setDraft(next); return true;
+  };
 
   const submitProgress = () => {
     const content = progressTextRef.current.trim();
@@ -154,21 +176,24 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
       await Promise.all([writes, progressWrites]);
       if (writes === writeChainRef.current && progressWrites === progressChainRef.current) break;
     }
-    return !normalFailedRef.current && !progressFailedRef.current;
+    return await prepareFollowUps() && !normalFailedRef.current && !progressFailedRef.current;
   }, []);
   useEffect(() => { onRegister({ prepareLeave }); return () => onRegister(null); }, [onRegister, prepareLeave]);
+
+  const toggleExpanded = async () => { if (expanded && !(await prepareFollowUps())) return; setExpanded((open) => !open); };
+  const remove = async () => { if (await prepareFollowUps() && window.confirm('删除后事项会移入回收站，确定继续吗？')) try { await api.trashItem(item.id); onChanged?.({ ...item, deletedAt: new Date().toISOString() }); } catch (reason) { reportFailure(reason, 'normal'); } };
 
   return <li className={selected ? 'item-row selected' : 'item-row'}>
     <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`}>
       <header className="item-card__header">
-        <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />
+        <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => void toggleExpanded()}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />{!readOnly && <button type="button" className="item-card__star" aria-label={draft.isStarred ? '取消星标' : '添加星标'} onClick={() => update('isStarred', !draft.isStarred)}>{draft.isStarred ? '★' : '☆'}</button>}{readOnly && draft.isStarred && <span className="item-card__star" aria-label="已星标">★</span>}
         <div className="item-copy"><span className="item-card__date">{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span className="item-card__category">{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
-        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <button type="button" className="restore-button" onClick={onSelect}>修改编辑</button>}
+        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <><button type="button" className="restore-button" onClick={onSelect}>修改编辑</button><button type="button" className="restore-button item-card__delete" onClick={() => void remove()}>删除</button></>}
       </header>
       <div className="item-card__body">
         <section className="item-card__progress" aria-label="最新进度" onClick={(event) => { if (!readOnly && !(event.target as HTMLElement).closest('textarea,button')) setProgressInputVisible((visible) => !visible); }}><b>最新进度</b><p className="item-card__progress-full">{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && progressInputVisible && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
-        {expanded && <><p className="item-card__situation"><b>情况</b><span>{draft.content || '未填写情况'}</span></p><section aria-label="跟进清单"><div className="item-card__follow-up-heading"><b>跟进清单</b>{!readOnly && <button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button>}</div>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} /><input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul></section><div className="item-card__notes"><b>备注</b><span>{draft.notes || '暂无备注'}</span></div></>}
+        {expanded && <><p className="item-card__situation"><b>情况</b><span>{draft.content || '未填写情况'}</span></p><section aria-label="跟进清单"><div className="item-card__follow-up-heading"><b>跟进清单</b>{!readOnly && <><button type="button" className="restore-button" onClick={() => updateFollowUps([...draftRef.current.followUps, newFollowUp()])}>＋ 添加跟进</button><button type="button" className="restore-button" disabled={!followUpsDirty() || saving > 0} onClick={() => void saveFollowUps()}>保存</button></>}</div>{draft.followUps.length === 0 && <p>暂无跟进项</p>}<ul>{draft.followUps.map((followUp) => <li key={followUp.id}><input aria-label={`完成：${followUp.text || '未命名跟进'}`} type="checkbox" checked={followUp.done} disabled={readOnly} onChange={() => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, done: !entry.done } : entry))} />{followUp.done && <span className="item-card__follow-up-done">已完成</span>}<input aria-label="跟进内容" value={followUp.text} disabled={readOnly} onChange={(event) => updateFollowUps(draftRef.current.followUps.map((entry) => entry.id === followUp.id ? { ...entry, text: event.target.value } : entry))} />{!readOnly && <button type="button" className="icon-button" aria-label="删除跟进" onClick={() => updateFollowUps(draftRef.current.followUps.filter((entry) => entry.id !== followUp.id))}>×</button>}</li>)}</ul></section><div className="item-card__notes"><b>备注</b><span>{draft.notes || '暂无备注'}</span></div></>}
         {saving > 0 && <small>正在保存…</small>}{normalError && <p role="alert">保存失败：{normalError}</p>}{progressError && <p role="alert">进度提交失败：{progressError}</p>}
       </div>
     </article>

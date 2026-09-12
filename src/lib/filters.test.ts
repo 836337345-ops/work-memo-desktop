@@ -3,7 +3,7 @@ import { filterItems, isOverdue, matchesDateFilter, sortByDueDate } from './filt
 import type { WorkItem } from '../types';
 
 const item = (dueDate: string | null, status: WorkItem['status'] = 'doing', createdAt = '2026-01-01T00:00:00Z'): WorkItem => ({
-  id: dueDate ?? 'none', title: '测试', content: '', categoryId: null, dueDate, status, notes: '', followUps: [], progress: [], createdAt, updatedAt: createdAt, deletedAt: null,
+  id: dueDate ?? 'none', title: '测试', content: '', categoryId: null, dueDate, status, notes: '', followUps: [], isStarred: false, progress: [], createdAt, updatedAt: createdAt, deletedAt: null,
 });
 
 describe('日期筛选', () => {
@@ -24,6 +24,12 @@ describe('日期筛选', () => {
     const sorted = sortByDueDate([item(null), item('2026-09-14', 'doing', '2026-01-01T00:00:00Z'), item('2026-09-14', 'doing', '2026-02-01T00:00:00Z'), item('2026-09-13')]);
     expect(sorted.map((entry) => entry.dueDate)).toEqual(['2026-09-13', '2026-09-14', '2026-09-14', null]);
     expect(sorted[1].createdAt).toBe('2026-02-01T00:00:00Z');
+  });
+
+  it('星标始终置前，同一星标组沿用原有日期排序', () => {
+    const starred = item(null); starred.id = 'starred'; starred.isStarred = true;
+    const early = item('2026-09-13'); early.id = 'early';
+    expect(sortByDueDate([starred, early]).map((entry) => entry.id)).toEqual(['starred', 'early']);
   });
 
   it('历史包含所有状态的已过截止日期事项，关键词仍可叠加', () => {

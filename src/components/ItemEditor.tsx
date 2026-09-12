@@ -5,7 +5,7 @@ import type { EditorHandle, FollowUp, FollowUpTemplate, ItemEditorProps, ItemInp
 import './editor.css';
 
 const makeId = (prefix: string) => globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })) });
+const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })), isStarred: item.isStarred });
 const initialDraft = (item: ItemInput | null, defaultCategoryId: string | null, defaultDueDate: string | null): ItemInput => item ? toInput(item) : { ...emptyItem(defaultCategoryId), dueDate: defaultDueDate ?? null };
 const hasDraft = (item: ItemInput) => Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.dueDate || item.followUps.length);
 
@@ -44,7 +44,7 @@ const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor
   const deleted = Boolean(item?.deletedAt); const disabled = deleted || saving; const followUps = draft.followUps;
 
   return <section className="item-editor" aria-label="事项编辑器">
-    <div className="item-editor__topbar"><div><p className="item-editor__eyebrow">{itemId ? '事项详情' : '新建事项'}</p><h2>{itemId ? '编辑事项' : '记录一件要紧的事'}</h2></div><div className="item-editor__topbar-actions">{itemId && !deleted && <button type="button" className="item-editor__danger" disabled={saving} onClick={() => void remove()}>删除事项</button>}<button type="button" className="item-editor__primary" disabled={disabled || !draft.title.trim()} onClick={() => void saveAll()}>{saving ? '保存中…' : '保存并关闭'}</button></div></div>
+    <div className="item-editor__topbar"><div><p className="item-editor__eyebrow">{itemId ? '事项详情' : '新建事项'}</p><h2>{itemId ? '编辑事项' : '记录一件要紧的事'}</h2></div><div className="item-editor__topbar-actions">{itemId && !deleted && <button type="button" className="item-editor__danger" disabled={saving} onClick={() => void remove()}>删除事项</button>}<button type="button" className="item-editor__secondary" disabled={saving} onClick={() => void prepareLeave().then((leave) => leave && onCancel())}>取消</button><button type="button" className="item-editor__primary" disabled={disabled || !draft.title.trim()} onClick={() => void saveAll()}>{saving ? '保存中…' : '保存并关闭'}</button></div></div>
     <div className="item-editor__scroll">
       {deleted && <p className="item-editor__readonly">此事项位于回收站，仅供查看。恢复请在回收站中操作。</p>}{error && <div className="item-editor__error" role="alert">{error}</div>}
       <div className="item-editor__fields"><label className="item-editor__field item-editor__field--title"><span>事项标题 <b aria-hidden="true">*</b></span><input value={draft.title} disabled={disabled} onChange={(event) => updateField('title', event.target.value)} placeholder="例如：确认秋季活动物料" /></label>

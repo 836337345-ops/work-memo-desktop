@@ -14,6 +14,7 @@
 .item-list .item-card__status { width: 82px; flex: none; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 5px 7px; color: #344c43; background: var(--card); font-size: 12px; box-shadow: var(--shadow-xs); }
 .item-list .item-card__status:hover:not(:disabled) { border-color: #a9c7b7; }
 .item-list .item-card__header .restore-button { flex: none; margin-left: 0; padding: 5px 6px; white-space: nowrap; }
+.item-list .item-card__star { flex: none; border: 0; padding: 0; color: #d59a26; background: transparent; font-size: 18px; line-height: 1; }.item-list .item-card__delete { color: var(--destructive); }.item-list .item-card__follow-up-done { color: var(--subtle-foreground); font-size: 11px; white-space: nowrap; }
 .item-list .item-card__body { display: grid; min-width: 0; gap: 7px; padding-top: 8px; }
 .item-list .item-card__body > section, .item-list .item-card__body > p, .item-list .item-card__body > div { min-width: 0; margin: 0; }
 .item-list .item-card__body b { display: inline-block; margin-right: 6px; color: #52675e; font-size: 14px; font-weight: 700; line-height: 1.4; }
@@ -30,7 +31,7 @@
 .item-list .item-card__follow-up-heading { display: flex; align-items: center; gap: 7px; }
 .item-list .item-card__follow-up-heading > b { margin-right: 0; }
 .item-list .item-card__follow-up-heading .restore-button { padding: 2px 5px; font-size: 12px; }
-.item-list .item-card__body section[aria-label="跟进清单"] li { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.item-list .item-card__body section[aria-label="跟进清单"] li { display: grid; min-width: 0; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
 .item-list .item-card__body section[aria-label="跟进清单"] li input[type=checkbox] { width: 15px; height: 15px; margin: 0; accent-color: var(--primary); }
 .item-list .item-card__body section[aria-label="跟进清单"] li input:not([type=checkbox]) { width: 100%; min-width: 0; border: 1px solid var(--input); border-radius: var(--radius-sm); padding: 5px 7px; color: var(--foreground); background: var(--card); font: inherit; font-size: 12px; }
 .item-list .item-card__body section[aria-label="跟进清单"] > p { margin: 5px 0 7px; color: var(--muted-foreground); font-size: 12px; }

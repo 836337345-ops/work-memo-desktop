@@ -64,6 +64,8 @@ struct Input {
     status: String,
     notes: String,
     follow_ups: Vec<FollowUp>,
+    #[serde(default)]
+    is_starred: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -200,6 +202,7 @@ fn valid_input(v: &Input) -> R<Input> {
         status: v.status.clone(),
         notes: v.notes.clone(),
         follow_ups,
+        is_starred: v.is_starred,
     })
 }
 fn row_item(r: &rusqlite::Row) -> rusqlite::Result<Item> {
@@ -213,10 +216,11 @@ fn row_item(r: &rusqlite::Row) -> rusqlite::Result<Item> {
             status: r.get(5)?,
             notes: r.get(6)?,
             follow_ups: vec![],
+            is_starred: r.get(7)?,
         },
-        created_at: r.get(7)?,
-        updated_at: r.get(8)?,
-        deleted_at: r.get(9)?,
+        created_at: r.get(8)?,
+        updated_at: r.get(9)?,
+        deleted_at: r.get(10)?,
         progress: vec![],
     })
 }
@@ -238,11 +242,21 @@ impl Store {
         c.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
  CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY,v TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS categories(id TEXT PRIMARY KEY,name TEXT NOT NULL COLLATE NOCASE UNIQUE,sort_order INTEGER NOT NULL);
- CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,title TEXT NOT NULL,content TEXT NOT NULL,category_id TEXT,due_date TEXT,status TEXT NOT NULL,notes TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT);
+ CREATE TABLE IF NOT EXISTS items(id TEXT PRIMARY KEY,title TEXT NOT NULL,content TEXT NOT NULL,category_id TEXT,due_date TEXT,status TEXT NOT NULL,notes TEXT NOT NULL,is_starred INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT);
  CREATE TABLE IF NOT EXISTS follow_ups(id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,text TEXT NOT NULL,done INTEGER NOT NULL,sort_order INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS progress_entries(id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,content TEXT NOT NULL,created_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS follow_up_templates(id TEXT PRIMARY KEY,category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,name TEXT NOT NULL,items_json TEXT NOT NULL,sort_order INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(category_id,name));
  CREATE INDEX IF NOT EXISTS idx_items_due ON items(due_date); CREATE INDEX IF NOT EXISTS idx_progress ON progress_entries(item_id,created_at DESC);").map_err(|_|fail("无法初始化本地数据库。"))?;
+        let has_starred = c
+            .prepare("PRAGMA table_info(items)")
+            .and_then(|mut statement| statement.query_map([], |row| row.get::<_, String>(1))?.collect::<Result<Vec<_>, _>>())
+            .map_err(|_| fail("无法检查本地数据库版本。"))?
+            .iter()
+            .any(|name| name == "is_starred");
+        if !has_starred {
+            c.execute("ALTER TABLE items ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0", [])
+                .map_err(|_| fail("无法升级本地数据库。"))?;
+        }
         c.execute("DELETE FROM items WHERE status='todo'", [])
             .map_err(|_| fail("无法清理已取消的待开展测试事项。"))?;
         let done: Option<String> = c
@@ -402,13 +416,13 @@ impl Store {
         self.templates()
     }
     fn detail(&self, id: &str) -> R<Item> {
-        let mut x=self.c.query_row("SELECT id,title,content,category_id,due_date,status,notes,created_at,updated_at,deleted_at FROM items WHERE id=?",[id],row_item).optional().map_err(|_|fail("无法读取事项。"))?.ok_or_else(||fail("未找到该事项。"))?;
+        let mut x=self.c.query_row("SELECT id,title,content,category_id,due_date,status,notes,is_starred,created_at,updated_at,deleted_at FROM items WHERE id=?",[id],row_item).optional().map_err(|_|fail("无法读取事项。"))?.ok_or_else(||fail("未找到该事项。"))?;
         x.input.follow_ups = self.follow(id)?;
         x.progress = self.progress(id)?;
         Ok(x)
     }
     fn items(&self) -> R<Vec<Item>> {
-        let mut s=self.c.prepare("SELECT id,title,content,category_id,due_date,status,notes,created_at,updated_at,deleted_at FROM items ORDER BY due_date IS NULL,due_date,created_at DESC").map_err(|_|fail("无法读取事项。"))?;
+        let mut s=self.c.prepare("SELECT id,title,content,category_id,due_date,status,notes,is_starred,created_at,updated_at,deleted_at FROM items ORDER BY is_starred DESC,due_date IS NULL,due_date,created_at DESC").map_err(|_|fail("无法读取事项。"))?;
         let v = s
             .query_map([], row_item)
             .map_err(|_| fail("无法读取事项。"))?
@@ -488,7 +502,7 @@ impl Store {
             .transaction()
             .map_err(|_| fail("无法开始保存事项。"))?;
         tx.execute(
-            "INSERT INTO items VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,NULL)",
+            "INSERT INTO items(id,title,content,category_id,due_date,status,notes,is_starred,created_at,updated_at,deleted_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,NULL)",
             params![
                 id,
                 v.title,
@@ -497,6 +511,7 @@ impl Store {
                 v.due_date,
                 v.status,
                 v.notes,
+                v.is_starred,
                 t,
                 t
             ],
@@ -513,7 +528,7 @@ impl Store {
             .c
             .transaction()
             .map_err(|_| fail("无法开始保存事项。"))?;
-        let n=tx.execute("UPDATE items SET title=?2,content=?3,category_id=?4,due_date=?5,status=?6,notes=?7,updated_at=?8 WHERE id=?1",params![id,v.title,v.content,v.category_id,v.due_date,v.status,v.notes,stamp()]).map_err(|_|fail("无法保存事项。"))?;
+        let n=tx.execute("UPDATE items SET title=?2,content=?3,category_id=?4,due_date=?5,status=?6,notes=?7,is_starred=?8,updated_at=?9 WHERE id=?1",params![id,v.title,v.content,v.category_id,v.due_date,v.status,v.notes,v.is_starred,stamp()]).map_err(|_|fail("无法保存事项。"))?;
         if n == 0 {
             return Err(fail("未找到该事项。"));
         };
@@ -688,7 +703,7 @@ impl Store {
                 continue;
             }
             tx.execute(
-                "INSERT INTO items VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                "INSERT INTO items(id,title,content,category_id,due_date,status,notes,is_starred,created_at,updated_at,deleted_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
                 params![
                     x.id,
                     x.input.title,
@@ -697,6 +712,7 @@ impl Store {
                     x.input.due_date,
                     x.input.status,
                     x.input.notes,
+                    x.input.is_starred,
                     x.created_at,
                     x.updated_at,
                     x.deleted_at
@@ -1301,6 +1317,7 @@ mod tests {
                 text: "跟进".into(),
                 done: false,
             }],
+            is_starred: false,
         }
     }
 
@@ -1368,7 +1385,7 @@ mod tests {
         s.progress_add(&keep.id, "保留进度").unwrap();
         let now = stamp();
         s.c.execute(
-            "INSERT INTO items VALUES(?1,?2,?3,NULL,NULL,'todo','',?4,?4,NULL)",
+            "INSERT INTO items(id,title,content,category_id,due_date,status,notes,created_at,updated_at,deleted_at) VALUES(?1,?2,?3,NULL,NULL,'todo','',?4,?4,NULL)",
             params!["legacy-todo", "待清理", "测试内容", now],
         )
         .unwrap();
@@ -1407,6 +1424,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!((removed_follow, removed_progress), (0, 0));
+    }
+
+    #[test]
+    fn old_database_migrates_star_column_with_false_default() {
+        let d = tempdir().unwrap();
+        let p = d.path().join("old.db");
+        let c = Connection::open(&p).unwrap();
+        c.execute_batch("CREATE TABLE meta(k TEXT PRIMARY KEY,v TEXT NOT NULL); CREATE TABLE categories(id TEXT PRIMARY KEY,name TEXT NOT NULL COLLATE NOCASE UNIQUE,sort_order INTEGER NOT NULL); CREATE TABLE items(id TEXT PRIMARY KEY,title TEXT NOT NULL,content TEXT NOT NULL,category_id TEXT,due_date TEXT,status TEXT NOT NULL,notes TEXT NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deleted_at TEXT); CREATE TABLE follow_ups(id TEXT PRIMARY KEY,item_id TEXT NOT NULL,text TEXT NOT NULL,done INTEGER NOT NULL,sort_order INTEGER NOT NULL); CREATE TABLE progress_entries(id TEXT PRIMARY KEY,item_id TEXT NOT NULL,content TEXT NOT NULL,created_at TEXT NOT NULL); CREATE TABLE follow_up_templates(id TEXT PRIMARY KEY,category_id TEXT NOT NULL,name TEXT NOT NULL,items_json TEXT NOT NULL,sort_order INTEGER NOT NULL,created_at TEXT NOT NULL,updated_at TEXT NOT NULL); INSERT INTO meta VALUES('defaults','1'); INSERT INTO items VALUES('old','旧事项','内容',NULL,NULL,'doing','', '2026-01-01T00:00:00Z','2026-01-01T00:00:00Z',NULL);").unwrap();
+        drop(c);
+        let s = Store::open(p).unwrap();
+        assert!(!s.items().unwrap()[0].input.is_starred);
     }
 
     #[test]
@@ -1472,8 +1500,12 @@ mod tests {
         let category_id = s.cats().unwrap()[0].id.clone();
         s.template_new(template(category_id.clone(), "原始模板", &["项目"]))
             .unwrap();
+        let mut starred = input();
+        starred.is_starred = true;
+        s.create(starred).unwrap();
         let backup = s.backup().unwrap();
         assert_eq!(info(&backup).template_count, 1);
+        assert!(backup.items[0].input.is_starred);
 
         s.template_new(template(category_id, "额外模板", &["额外项目"]))
             .unwrap();
@@ -1488,6 +1520,12 @@ mod tests {
         assert!(legacy_backup.templates.is_empty());
         s.restore(&legacy_backup).unwrap();
         assert!(s.templates().unwrap().is_empty());
+
+        let mut legacy_star = serde_json::to_value(&backup).unwrap();
+        legacy_star["items"][0].as_object_mut().unwrap().remove("isStarred");
+        fs::write(&legacy_path, serde_json::to_vec(&legacy_star).unwrap()).unwrap();
+        let legacy_backup = read(&legacy_path).unwrap();
+        assert!(!legacy_backup.items[0].input.is_starred);
     }
 
     #[test]
@@ -1604,6 +1642,7 @@ mod export_tests {
             status: status.into(),
             notes: String::new(),
             follow_ups: vec![],
+            is_starred: false,
         }
     }
 

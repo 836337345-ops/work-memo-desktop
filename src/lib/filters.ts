@@ -67,6 +67,7 @@ export function searchItems(items: WorkItem[], query = '') {
 
 export function sortByDueDate(items: WorkItem[]) {
   return [...items].sort((left, right) => {
+    if (left.isStarred !== right.isStarred) return left.isStarred ? -1 : 1;
     if (left.dueDate === null && right.dueDate !== null) return 1;
     if (left.dueDate !== null && right.dueDate === null) return -1;
     if (left.dueDate !== right.dueDate) return (left.dueDate ?? '').localeCompare(right.dueDate ?? '');

@@ -8,9 +8,9 @@ import { api } from '../../api';
 import { ItemList } from './ItemList';
 import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
 
-vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn() } }));
+vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn(), trashItem: vi.fn() } }));
 
-const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'doing', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
+const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'doing', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], isStarred: false, progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
 const categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }];
 const saved = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem => ({ ...base, ...input, updatedAt: '2026-01-02T00:00:00Z', ...overrides });
 const props = () => ({ items: [base], categories, selectedId: null, onSelect: vi.fn(), onChanged: vi.fn(), onError: vi.fn() });
@@ -153,9 +153,11 @@ describe('V2.2 可折叠事项卡', () => {
     expect(api.updateItem).not.toHaveBeenCalled();
     const inputs = screen.getAllByLabelText('跟进内容') as HTMLInputElement[];
     fireEvent.change(inputs[1], { target: { value: '发送会议纪要' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
     expect((await screen.findByRole('alert')).textContent).toContain('跟进暂不可写');
     expect(inputs[1].value).toBe('发送会议纪要');
     fireEvent.change(inputs[1], { target: { value: '发送会议纪要（已确认）' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(next.onError).toHaveBeenLastCalledWith('', 'normal');
@@ -191,10 +193,13 @@ describe('V2.2 可折叠事项卡', () => {
     expect(await ref.current?.prepareLeave()).toBe(false);
   });
 
-  it('状态操作和跟进仍可内联保存，回收站卡片只读', async () => {
+  it('状态操作和跟进显式保存，回收站卡片只读', async () => {
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
     fireEvent.click(screen.getByLabelText('完成：确认联系人'));
+    expect(vi.mocked(api.updateItem)).not.toHaveBeenCalled();
+    expect(document.querySelector('.item-card__follow-up-done')?.textContent).toBe('已完成');
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.status === 'doing' && input.followUps[0].done)).toBe(true));
 
     cleanup();
@@ -202,6 +207,18 @@ describe('V2.2 可折叠事项卡', () => {
     render(<ItemList items={[{ ...base, deletedAt: '2026-01-03T00:00:00Z' }]} categories={categories} selectedId={null} onSelect={vi.fn()} onRestore={onRestore} />);
     expect(screen.getByLabelText('联系客户的状态').hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: '还原' })).toBeTruthy();
+  });
+
+  it('星标和卡片删除分别复用事项更新与软删除', async () => {
+    vi.mocked(api.trashItem).mockResolvedValue();
+    const next = props();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ItemList {...next} />);
+    fireEvent.click(screen.getByRole('button', { name: '添加星标' }));
+    await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls[0][1].isStarred).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    await waitFor(() => expect(api.trashItem).toHaveBeenCalledWith('one'));
+    expect(next.onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 'one', deletedAt: expect.any(String) }));
   });
 
   it('离开保护等待当前内联保存并在失败时阻止卸载', async () => {

@@ -7,7 +7,7 @@ import { holidaysForYear } from './calendar';
 import { readFileSync } from 'node:fs';
 import type { WorkItem } from '../../types';
 
-const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({ id: 'item-1', title: '今天事项', content: '', categoryId: null, dueDate: '2026-09-07', status: 'doing', notes: '', followUps: [], progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, ...overrides });
+const makeItem = (overrides: Partial<WorkItem> = {}): WorkItem => ({ id: 'item-1', title: '今天事项', content: '', categoryId: null, dueDate: '2026-09-07', status: 'doing', notes: '', followUps: [], isStarred: false, progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, ...overrides });
 
 beforeEach(() => vi.setSystemTime(new Date(2026, 8, 7, 12, 0)));
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -57,6 +57,21 @@ describe('WorkCalendar', () => {
     expect(directTitles()).toEqual(['活动事项', '未分类事项']);
     fireEvent.click(screen.getByRole('button', { name: '全部' }));
     expect(directTitles()).toEqual(['活动事项', '推广事项', '未分类事项']);
+  });
+
+  it('状态可多选，并与分类选择叠加', () => {
+    const { container } = render(<WorkCalendar categories={[{ id: 'a', name: '活动', sortOrder: 0 }]} items={[
+      makeItem({ id: 'doing', title: '进行中', categoryId: 'a', status: 'doing' }),
+      makeItem({ id: 'done', title: '已完成', categoryId: 'a', status: 'done' }),
+      makeItem({ id: 'paused', title: '已暂停', categoryId: null, status: 'paused' }),
+    ]} onClose={vi.fn()} />);
+    const titles = () => Array.from(container.querySelectorAll('.work-calendar__title')).map((node) => node.textContent);
+    fireEvent.click(screen.getByRole('checkbox', { name: '进行中' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '已完成' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '活动' }));
+    expect(titles()).toEqual(['进行中', '已完成']);
+    fireEvent.click(screen.getByRole('button', { name: '全部状态' }));
+    expect(titles()).toEqual(['进行中', '已完成']);
   });
 
   it('为三种事项状态渲染对应的日历标记 class', () => {

@@ -7,7 +7,7 @@ import type { FollowUpTemplate, ItemInput, WorkItem } from '../types';
 
 vi.mock('../api', () => ({ api: { createItem: vi.fn(), updateItem: vi.fn(), trashItem: vi.fn(), listFollowUpTemplates: vi.fn(), createFollowUpTemplate: vi.fn(), updateFollowUpTemplate: vi.fn(), deleteFollowUpTemplate: vi.fn() } }));
 const savedItem = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem => ({ ...input, id: 'item-1', createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: null, progress: [], ...overrides });
-const base = savedItem({ title: '原事项', content: '', categoryId: null, dueDate: null, status: 'doing', notes: '', followUps: [] });
+const base = savedItem({ title: '原事项', content: '', categoryId: null, dueDate: null, status: 'doing', notes: '', followUps: [], isStarred: false });
 const props = { item: base, categories: [], onSaved: vi.fn(), onDeleted: vi.fn(), onCancel: vi.fn() };
 
 describe('V2.8 ItemEditor', () => {
@@ -32,7 +32,7 @@ describe('V2.8 ItemEditor', () => {
   });
 
   it('新建和已有事项统一使用顶部保存并关闭按钮，成功后关闭编辑栏', async () => {
-    const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [] }; vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
+    const input = { title: '新事项', content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [], isStarred: false }; vi.mocked(api.createItem).mockResolvedValue(savedItem(input));
     render(<ItemEditor {...props} item={null} />); fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '新事项' } }); fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     await waitFor(() => expect(api.createItem).toHaveBeenCalledWith(expect.objectContaining({ title: '新事项', status: 'doing' }))); expect(props.onSaved).toHaveBeenCalled(); expect(props.onCancel).toHaveBeenCalled();
   });

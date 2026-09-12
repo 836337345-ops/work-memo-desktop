@@ -220,7 +220,7 @@ describe('App 工作日历入口', () => {
   it('从日历事项返回工作台并展开对应卡片，但不打开编辑栏', async () => {
     const today = new Date();
     const dueDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    vi.mocked(api.listItems).mockResolvedValue([{ id: 'calendar-item', title: '日历跳转事项', content: '事项情况', categoryId: null, dueDate, status: 'doing', notes: '', followUps: [], progress: [], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null }]);
+    vi.mocked(api.listItems).mockResolvedValue([{ id: 'calendar-item', title: '日历跳转事项', content: '事项情况', categoryId: null, dueDate, status: 'doing', notes: '', followUps: [], isStarred: false, progress: [], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null }]);
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: '工作日历' }));
     const day = await waitFor(() => {
