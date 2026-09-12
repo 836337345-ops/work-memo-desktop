@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { api } from '../../api';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import { STATUS_LABELS, type Category, type FollowUp, type ItemInput, type ItemListHandle, type ItemStatus, type WorkItem } from '../../types';
 import { formatChineseDate } from '../../lib/dateFormat';
 import { isOverdue } from '../../lib/filters';
@@ -179,15 +180,15 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   useEffect(() => { onRegister({ prepareLeave }); return () => onRegister(null); }, [onRegister, prepareLeave]);
 
   const toggleExpanded = async () => { if (expanded && !(await prepareFollowUps())) return; setExpanded((open) => !open); };
-  const remove = async () => { if (await prepareFollowUps() && window.confirm('删除后事项会移入回收站，确定继续吗？')) try { await api.trashItem(item.id); onChanged?.({ ...item, deletedAt: new Date().toISOString() }); } catch (reason) { reportFailure(reason, 'normal'); } };
+  const remove = async () => { if (!(await prepareFollowUps())) return; if (!await confirm('删除后事项会移入回收站，确定继续吗？', { title: '删除事项', okLabel: '确认删除', cancelLabel: '取消' })) return; try { await api.trashItem(item.id); onChanged?.({ ...item, deletedAt: new Date().toISOString() }); } catch (reason) { reportFailure(reason, 'normal'); } };
 
   return <li className={selected ? 'item-row selected' : 'item-row'}>
     <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`} onBlur={(event) => { if (!readOnly && !event.currentTarget.contains(event.relatedTarget as Node | null)) void prepareFollowUps(); }}>
       <header className="item-card__header">
         <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => void toggleExpanded()}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />{draft.isStarred && <span className="item-card__star" aria-label="已星标">★</span>}
-        <div className="item-copy"><span className="item-card__date">{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span className="item-card__category">{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.isStarred && '★ '}{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
+        <div className="item-copy"><span className="item-card__date">{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span className="item-card__category">{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
-        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <><button type="button" className="restore-button" onClick={onSelect}>修改编辑</button><button type="button" className="restore-button item-card__delete" onClick={() => void remove()}>删除</button><button type="button" className="restore-button item-card__important" onClick={() => update('isStarred', !draft.isStarred)}>{draft.isStarred ? '取消重要事项' : '重要事项'}</button></>}
+        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <><button type="button" className="restore-button" onClick={onSelect}>修改编辑</button><button type="button" className="restore-button item-card__delete" onClick={() => void remove()}>删除</button><button type="button" className="restore-button item-card__important" onClick={() => update('isStarred', !draft.isStarred)}>{draft.isStarred ? '取消重要事项' : '设置重要事项'}</button></>}
       </header>
       <div className="item-card__body">
         <section className="item-card__progress" aria-label="最新进度" onClick={(event) => { if (!readOnly && !(event.target as HTMLElement).closest('textarea,button')) setProgressInputVisible((visible) => !visible); }}><b>最新进度</b><p className="item-card__progress-full">{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && progressInputVisible && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>

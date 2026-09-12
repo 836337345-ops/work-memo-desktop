@@ -131,6 +131,15 @@ describe('V2.8 ItemEditor', () => {
     expect(section.querySelector('.item-editor__follow-up-tools')?.nextElementSibling?.tagName).toBe('UL');
   });
 
+  it('新建未选类别时模板入口可见但不可用，并提示先选类别', () => {
+    render(<ItemEditor {...props} item={null} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
+    const templateButton = screen.getByRole('button', { name: '清单模板设置和应用' }) as HTMLButtonElement;
+    expect(templateButton.disabled).toBe(true);
+    expect(screen.getByText('请先选择所属类别')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('所属类别'), { target: { value: 'cat' } });
+    expect((screen.getByRole('button', { name: '清单模板设置和应用' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('保存时清除空白跟进，并写入重要事项标记', async () => {
     vi.mocked(api.createItem).mockImplementation(async (input) => savedItem(input));
     render(<ItemEditor {...props} item={null} />);

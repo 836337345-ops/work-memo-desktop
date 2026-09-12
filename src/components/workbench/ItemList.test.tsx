@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // @ts-expect-error Node 类型并非前端生产依赖；Vitest 在 Node 环境中读取样式契约。
 import { readFileSync } from 'node:fs';
 import { api } from '../../api';
+import { confirm } from '@tauri-apps/plugin-dialog';
 import { ItemList } from './ItemList';
 import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
 
 vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn(), trashItem: vi.fn() } }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ confirm: vi.fn() }));
 
 const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'doing', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], isStarred: false, progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
 const categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }];
@@ -16,7 +18,7 @@ const saved = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem =>
 const props = () => ({ items: [base], categories, selectedId: null, onSelect: vi.fn(), onChanged: vi.fn(), onError: vi.fn() });
 
 afterEach(cleanup);
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.updateItem).mockImplementation(async (_id, input) => saved(input)); });
+beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.updateItem).mockImplementation(async (_id, input) => saved(input)); vi.mocked(confirm).mockResolvedValue(false); });
 
 describe('V2.2 可折叠事项卡', () => {
   it('定位事项会滚动标记并展开目标卡片，不触发选择', () => {
@@ -240,14 +242,33 @@ describe('V2.2 可折叠事项卡', () => {
     expect(css).toMatch(/\.item-card__follow-up-done \{[^}]*color: var\(--destructive\)[^}]*font-weight: 700/);
   });
 
-  it('星标和卡片删除分别复用事项更新与软删除', async () => {
+  it('重要事项入口文案、唯一星标和原生删除确认分别符合约定', async () => {
     vi.mocked(api.trashItem).mockResolvedValue();
     const next = props();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ItemList {...next} />);
-    fireEvent.click(screen.getByRole('button', { name: '重要事项' }));
+    fireEvent.click(screen.getByRole('button', { name: '设置重要事项' }));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls[0][1].isStarred).toBe(true));
+    expect(screen.getByRole('button', { name: '取消重要事项' })).toBeTruthy();
+    expect(screen.getByRole('article', { name: '事项：联系客户' }).querySelectorAll('.item-card__star')).toHaveLength(1);
+    expect(screen.getByText('联系客户').textContent).not.toContain('★');
+    expect(readFileSync('src/components/workbench/item-card.css', 'utf8')).toMatch(/\.item-card__important \{[^}]*border: 1px solid/);
     fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith('删除后事项会移入回收站，确定继续吗？', { title: '删除事项', okLabel: '确认删除', cancelLabel: '取消' }));
+    expect(api.trashItem).not.toHaveBeenCalled();
+  });
+
+  it('原生删除确认后才软删除，并避免离焦重复保存', async () => {
+    vi.mocked(api.trashItem).mockResolvedValue();
+    vi.mocked(confirm).mockResolvedValue(true);
+    const next = props();
+    render(<ItemList {...next} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    const input = screen.getByLabelText('跟进内容');
+    fireEvent.change(input, { target: { value: '删除前自动保存一次' } });
+    fireEvent.blur(input, { relatedTarget: screen.getByRole('button', { name: '删除' }) });
+    fireEvent.click(screen.getByRole('button', { name: '删除' }));
+    await waitFor(() => expect(api.trashItem).toHaveBeenCalledWith('one'));
+    expect(api.updateItem).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(api.trashItem).toHaveBeenCalledWith('one'));
     expect(next.onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 'one', deletedAt: expect.any(String) }));
   });
