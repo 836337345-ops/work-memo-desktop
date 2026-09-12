@@ -62,7 +62,7 @@ describe('V2.8 ItemEditor', () => {
   it('只展示当前类别模板，应用时按 trim 后文字跳过重复项', async () => {
     const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '健康讲座', items: ['确认场地', '邀约客户', ' 邀约客户 '], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]);
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat', followUps: [{ id: 'f1', text: ' 确认场地 ', done: false }] })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
-    fireEvent.click(screen.getByRole('button', { name: '模板设定/应用' })); await waitFor(() => expect(screen.getByText('健康讲座')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '应用' }));
+    fireEvent.click(screen.getByRole('button', { name: '清单模板设置和应用' })); await waitFor(() => expect(screen.getByText('健康讲座')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '应用' }));
     expect(screen.getAllByLabelText('跟进内容')).toHaveLength(2); expect((screen.getAllByLabelText('跟进内容')[1] as HTMLInputElement).value).toBe('邀约客户');
   });
 
@@ -70,24 +70,24 @@ describe('V2.8 ItemEditor', () => {
     const created: FollowUpTemplate = { id: 'tpl-new', categoryId: 'cat', name: '车库开放', items: ['确认流程'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.createFollowUpTemplate).mockResolvedValue([created]);
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
     expect(screen.queryByRole('button', { name: '＋ 新建模板' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '模板设定/应用' })); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' }));
+    fireEvent.click(screen.getByRole('button', { name: '清单模板设置和应用' })); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' }));
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '车库开放' } }); fireEvent.change(screen.getByLabelText('模板文字项 1'), { target: { value: '确认流程' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
     await waitFor(() => expect(api.createFollowUpTemplate).toHaveBeenCalledWith({ categoryId: 'cat', name: '车库开放', items: ['确认流程'] }));
   });
 
   it('可编辑已有模板并保留当前类别', async () => {
     const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '旧模板', items: ['旧事项'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]); vi.mocked(api.updateFollowUpTemplate).mockResolvedValue([{ ...template, name: '新模板' }]);
-    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '模板设定/应用' })); await waitFor(() => expect(screen.getByText('旧模板')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '编辑' }));
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '清单模板设置和应用' })); await waitFor(() => expect(screen.getByText('旧模板')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '编辑' }));
     fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '新模板' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' })); await waitFor(() => expect(api.updateFollowUpTemplate).toHaveBeenCalledWith('tpl-1', { categoryId: 'cat', name: '新模板', items: ['旧事项'] }));
   });
 
   it('可删除已有模板', async () => {
     const template: FollowUpTemplate = { id: 'tpl-1', categoryId: 'cat', name: '待删除', items: ['确认'], sortOrder: 0, createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z' }; vi.mocked(api.listFollowUpTemplates).mockResolvedValue([template]); vi.mocked(api.deleteFollowUpTemplate).mockResolvedValue([]);
-    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '模板设定/应用' })); await waitFor(() => expect(screen.getByText('待删除')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '删除模板：待删除' })); await waitFor(() => expect(api.deleteFollowUpTemplate).toHaveBeenCalledWith('tpl-1'));
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '清单模板设置和应用' })); await waitFor(() => expect(screen.getByText('待删除')).toBeTruthy()); fireEvent.click(screen.getByRole('button', { name: '删除模板：待删除' })); await waitFor(() => expect(api.deleteFollowUpTemplate).toHaveBeenCalledWith('tpl-1'));
   });
 
   it('模板校验失败时在弹窗内显示错误并保留输入', async () => {
-    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '模板设定/应用' })); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' })); fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '保留名称' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
+    render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />); fireEvent.click(screen.getByRole('button', { name: '清单模板设置和应用' })); fireEvent.click(screen.getByRole('button', { name: '＋ 新建模板' })); fireEvent.change(screen.getByLabelText('模板名称'), { target: { value: '保留名称' } }); fireEvent.click(screen.getByRole('button', { name: '保存模板' }));
     const alert = await screen.findByRole('alert'); expect(alert.textContent).toContain('请填写模板名称'); expect((screen.getByLabelText('模板名称') as HTMLInputElement).value).toBe('保留名称'); expect(screen.getByRole('dialog')).toBeTruthy();
   });
 
@@ -108,25 +108,35 @@ describe('V2.8 ItemEditor', () => {
     expect(screen.queryByRole('button', { name: '删除事项' })).toBeNull();
   });
 
-  it('跟进区首行左右提供添加清单和模板设定入口，具体清单位于其后', () => {
+  it('跟进区首行左右提供添加清单和模板入口，具体清单位于其后', () => {
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat', followUps: [{ id: 'f1', text: '准备场地', done: false }] })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
     const section = screen.getByRole('region', { name: '跟进清单' });
     const tools = section.firstElementChild as HTMLElement;
     expect(tools.classList.contains('item-editor__follow-up-tools')).toBe(true);
-    expect(tools.firstElementChild?.textContent).toBe('添加清单');
-    expect(tools.lastElementChild?.textContent).toBe('模板设定/应用');
+    expect(tools.firstElementChild?.textContent).toBe('＋ 添加清单');
+    expect(tools.lastElementChild?.textContent).toBe('清单模板设置和应用');
     expect(section.querySelector('ul')!.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 
   it('跟进清单的操作和输入均有可访问名称，添加后可直接填写与完成', () => {
     render(<ItemEditor {...props} item={savedItem({ ...base, categoryId: 'cat' })} categories={[{ id: 'cat', name: '活动', sortOrder: 0 }]} />);
     const section = screen.getByRole('region', { name: '跟进清单' });
-    expect(screen.getByRole('button', { name: '添加清单' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '模板设定/应用' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '＋ 添加清单' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '清单模板设置和应用' })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '添加清单' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 添加清单' }));
     fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '联系负责人' } });
     expect(screen.getByLabelText('完成：联系负责人')).toBeTruthy();
     expect(section.querySelector('.item-editor__follow-up-tools')?.nextElementSibling?.tagName).toBe('UL');
+  });
+
+  it('保存时清除空白跟进，并写入重要事项标记', async () => {
+    vi.mocked(api.updateItem).mockImplementation(async (_id, input) => savedItem(input));
+    render(<ItemEditor {...props} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: '重要事项' }));
+    fireEvent.click(screen.getByRole('button', { name: '＋ 添加清单' }));
+    fireEvent.change(screen.getByLabelText('跟进内容'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
+    await waitFor(() => expect(api.updateItem).toHaveBeenCalledWith('item-1', expect.objectContaining({ isStarred: true, followUps: [] })));
   });
 });

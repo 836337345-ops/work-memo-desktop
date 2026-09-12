@@ -5,12 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // @ts-expect-error Node 类型并非前端生产依赖；Vitest 在 Node 环境中读取样式契约。
 import { readFileSync } from 'node:fs';
 import { api } from '../../api';
-import { confirm } from '@tauri-apps/plugin-dialog';
 import { ItemList } from './ItemList';
 import type { ItemInput, ItemListHandle, WorkItem } from '../../types';
 
 vi.mock('../../api', () => ({ api: { updateItem: vi.fn(), addProgress: vi.fn(), trashItem: vi.fn() } }));
-vi.mock('@tauri-apps/plugin-dialog', () => ({ confirm: vi.fn() }));
 
 const base: WorkItem = { id: 'one', title: '联系客户', content: '确认本周合作方案', categoryId: 'promotion', dueDate: '2000-01-01', status: 'doing', notes: '优先电话沟通', followUps: [{ id: 'f1', text: '确认联系人', done: false }], isStarred: false, progress: [{ id: 'p1', content: '完整进度文本不可截断', createdAt: '2026-01-01T00:00:00Z' }], createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', deletedAt: null };
 const categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }];
@@ -18,7 +16,7 @@ const saved = (input: ItemInput, overrides: Partial<WorkItem> = {}): WorkItem =>
 const props = () => ({ items: [base], categories, selectedId: null, onSelect: vi.fn(), onChanged: vi.fn(), onError: vi.fn() });
 
 afterEach(cleanup);
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.updateItem).mockImplementation(async (_id, input) => saved(input)); vi.mocked(confirm).mockResolvedValue(false); });
+beforeEach(() => { vi.clearAllMocks(); vi.mocked(api.updateItem).mockImplementation(async (_id, input) => saved(input)); });
 
 describe('V2.2 可折叠事项卡', () => {
   it('定位事项会滚动标记并展开目标卡片，不触发选择', () => {
@@ -155,11 +153,11 @@ describe('V2.2 可折叠事项卡', () => {
     expect(api.updateItem).not.toHaveBeenCalled();
     const inputs = screen.getAllByLabelText('跟进内容') as HTMLInputElement[];
     fireEvent.change(inputs[1], { target: { value: '发送会议纪要' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起事项' }));
     expect((await screen.findByRole('alert')).textContent).toContain('跟进暂不可写');
     expect(inputs[1].value).toBe('发送会议纪要');
     fireEvent.change(inputs[1], { target: { value: '发送会议纪要（已确认）' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起事项' }));
     await waitFor(() => expect(api.updateItem).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
     expect(next.onError).toHaveBeenLastCalledWith('', 'normal');
@@ -195,13 +193,13 @@ describe('V2.2 可折叠事项卡', () => {
     expect(await ref.current?.prepareLeave()).toBe(false);
   });
 
-  it('状态操作和跟进显式保存，回收站卡片只读', async () => {
+  it('状态操作保留现有规则，跟进会在收起时自动保存，回收站卡片只读', async () => {
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
     fireEvent.click(screen.getByLabelText('完成：确认联系人'));
     expect(vi.mocked(api.updateItem)).not.toHaveBeenCalled();
     expect(document.querySelector('.item-card__follow-up-done')?.textContent).toBe('已完成');
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.click(screen.getByRole('button', { name: '收起事项' }));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.status === 'doing' && input.followUps[0].done)).toBe(true));
 
     cleanup();
@@ -211,15 +209,35 @@ describe('V2.2 可折叠事项卡', () => {
     expect(screen.getByRole('button', { name: '还原' })).toBeTruthy();
   });
 
-  it('收起未保存跟进时用明确的保存和不保存选项', async () => {
-    vi.mocked(confirm).mockResolvedValue(true);
+  it('收起未保存跟进时自动保存，不再显示保存选择', async () => {
     render(<ItemList {...props()} />);
     fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
     fireEvent.click(screen.getByLabelText('完成：确认联系人'));
     fireEvent.click(screen.getByRole('button', { name: '收起事项' }));
-    await waitFor(() => expect(confirm).toHaveBeenCalledWith('跟进清单修改未保存，是否保存？', { title: '未保存的跟进清单', okLabel: '保存', cancelLabel: '不保存' }));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, input]) => input.followUps[0].done)).toBe(true));
     expect(screen.getByRole('button', { name: '展开事项' })).toBeTruthy();
+  });
+
+  it('焦点离开卡片时自动保存已修改的跟进', async () => {
+    render(<ItemList {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    const input = screen.getByLabelText('跟进内容');
+    fireEvent.change(input, { target: { value: '已在卡片外点击前修改' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls.some(([, savedInput]) => savedInput.followUps[0].text === '已在卡片外点击前修改')).toBe(true));
+  });
+
+  it('未完成跟进排在前方，完成文字使用强调样式', () => {
+    const item = { ...base, followUps: [{ id: 'done', text: '已完成的步骤', done: true }, { id: 'open', text: '待处理的步骤', done: false }] };
+    render(<ItemList {...props()} items={[item]} />);
+    fireEvent.click(screen.getByRole('button', { name: '展开事项' }));
+    const rows = Array.from(document.querySelectorAll('.item-card__body section[aria-label="跟进清单"] li')) as HTMLElement[];
+    expect((rows[0].querySelector('input[aria-label="跟进内容"]') as HTMLInputElement).value).toBe('待处理的步骤');
+    expect((rows[1].querySelector('input[aria-label="跟进内容"]') as HTMLInputElement).value).toBe('已完成的步骤');
+    expect(rows[0].classList.contains('is-open')).toBe(true);
+    expect(document.querySelector('.item-card__follow-up-done')?.className).toContain('follow-up-done');
+    const css = readFileSync('src/components/workbench/item-card.css', 'utf8');
+    expect(css).toMatch(/\.item-card__follow-up-done \{[^}]*color: var\(--destructive\)[^}]*font-weight: 700/);
   });
 
   it('星标和卡片删除分别复用事项更新与软删除', async () => {
@@ -227,7 +245,7 @@ describe('V2.2 可折叠事项卡', () => {
     const next = props();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<ItemList {...next} />);
-    fireEvent.click(screen.getByRole('button', { name: '添加星标' }));
+    fireEvent.click(screen.getByRole('button', { name: '重要事项' }));
     await waitFor(() => expect(vi.mocked(api.updateItem).mock.calls[0][1].isStarred).toBe(true));
     fireEvent.click(screen.getByRole('button', { name: '删除' }));
     await waitFor(() => expect(api.trashItem).toHaveBeenCalledWith('one'));

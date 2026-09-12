@@ -7,7 +7,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 const { appWindow } = vi.hoisted(() => ({ appWindow: { onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn(), setTitle: vi.fn(() => Promise.resolve()) } }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => appWindow) }));
-vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn() } }));
+vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn(), restoreItem: vi.fn() } }));
 vi.mock('@tauri-apps/plugin-autostart', () => ({ isEnabled: vi.fn(), enable: vi.fn(), disable: vi.fn() }));
 
 afterEach(cleanup);
@@ -247,5 +247,21 @@ describe('App 工作日历入口', () => {
     fireEvent.click(firstDay.querySelector('.work-calendar__new-item') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('region', { name: '事项编辑器' })).toBeTruthy());
     expect((screen.getByLabelText('截止日期') as HTMLInputElement).value).toBe(dueDate);
+  });
+});
+
+describe('App 回收站还原', () => {
+  it('还原后回到原列表，不会打开新建编辑栏', async () => {
+    const deletedItem = { id: 'trash-1', title: '待还原事项', content: '', categoryId: null, dueDate: '2026-09-12', status: 'doing' as const, notes: '', followUps: [], isStarred: false, progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: '2026-09-02T00:00:00Z' };
+    vi.mocked(api.listItems).mockResolvedValue([deletedItem]);
+    vi.mocked(api.restoreItem).mockResolvedValue({ ...deletedItem, deletedAt: null });
+    render(<App />);
+    await screen.findByRole('button', { name: '回收站' });
+    fireEvent.click(screen.getByRole('button', { name: '回收站' }));
+    fireEvent.click(await screen.findByRole('button', { name: '还原' }));
+    await waitFor(() => expect(api.restoreItem).toHaveBeenCalledWith('trash-1'));
+    expect(await screen.findByRole('heading', { name: '进行中' })).toBeTruthy();
+    expect(screen.getByText('选择一条事项')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: '记录一件要紧的事' })).toBeNull();
   });
 });

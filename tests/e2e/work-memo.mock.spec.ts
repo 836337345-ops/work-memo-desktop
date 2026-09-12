@@ -375,7 +375,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
   test('跟进模板按真实类别隔离，应用会 trim 去重；未分类不显示模板入口', async ({ page }) => {
     await page.getByRole('article', { name: '事项：样板间开放推广' }).getByRole('button', { name: '修改编辑' }).click();
     const editor = page.getByRole('region', { name: '事项编辑器' });
-    await editor.getByRole('button', { name: '模板管理与应用' }).click();
+    await editor.getByRole('button', { name: '清单模板设置和应用' }).click();
     await expect(editor.getByText('开放日流程', { exact: true })).toBeVisible();
     await expect(editor.getByText('活动复盘', { exact: true })).toHaveCount(0);
     await editor.getByRole('button', { name: '应用' }).click();
@@ -384,7 +384,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     expect(values.filter((value) => value === '确认场地')).toHaveLength(1);
 
     await editor.getByLabel('所属类别').selectOption('');
-    await expect(editor.getByRole('button', { name: '模板管理与应用' })).toHaveCount(0);
+    await expect(editor.getByRole('button', { name: '清单模板设置和应用' })).toHaveCount(0);
     await expect(editor.getByRole('button', { name: '＋ 新建模板' })).toHaveCount(0);
   });
 
@@ -401,7 +401,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
     await dialog.getByLabel('模板名称').fill('临时模板');
     await dialog.getByLabel('模板文字项 1').fill('临时事项');
     await dialog.getByRole('button', { name: '保存模板' }).click();
-    await editor.getByRole('button', { name: '模板管理与应用' }).click();
+    await editor.getByRole('button', { name: '清单模板设置和应用' }).click();
     await expect(editor.getByText('临时模板', { exact: true })).toBeVisible();
     await editor.getByRole('button', { name: '删除模板：临时模板' }).click();
     await expect(editor.getByText('临时模板', { exact: true })).toHaveCount(0);
@@ -697,7 +697,7 @@ test.describe('工作备忘录 V2 UI / IPC 模拟验收', () => {
       const editor = page.getByRole('region', { name: '事项编辑器' });
       await expect(editor.getByLabel('截止日期')).toHaveValue(date);
       await editor.getByLabel(/事项标题/).fill(title);
-      await editor.getByRole('button', { name: '创建并关闭' }).click();
+      await editor.getByRole('button', { name: '保存并关闭' }).click();
       await expect(editor).toHaveCount(0);
       const created = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').at(-1).payload.input);
       expect(created.dueDate).toBe(date);
@@ -915,8 +915,8 @@ test.describe('工作备忘录 V2.8 独立验收', () => {
     await expect(editor.getByRole('button', { name: '删除事项', exact: true })).toHaveCount(0);
     await editor.getByLabel('所属类别').selectOption('cat-event');
 
-    const add = editor.getByRole('button', { name: '添加清单', exact: true });
-    const templates = editor.getByRole('button', { name: '模板设定/应用', exact: true });
+    const add = editor.getByRole('button', { name: '＋ 添加清单', exact: true });
+    const templates = editor.getByRole('button', { name: '清单模板设置和应用', exact: true });
     const [addBox, templateBox] = await Promise.all([add.boundingBox(), templates.boundingBox()]);
     expect(addBox && templateBox && Math.abs(addBox.y - templateBox.y)).toBeLessThan(3);
     expect(addBox && templateBox && addBox.x).toBeLessThan(templateBox?.x ?? 0);
@@ -932,7 +932,7 @@ test.describe('工作备忘录 V2.8 独立验收', () => {
     await expect(editor.getByRole('button', { name: '＋ 新建模板', exact: true })).toBeVisible();
 
     await editor.getByLabel(/事项标题/).fill('V2.8 默认状态验收事项');
-    await editor.getByRole('button', { name: '创建并关闭', exact: true }).click();
+    await editor.getByRole('button', { name: '保存并关闭', exact: true }).click();
     const payload = await page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'create_item').at(-1).payload.input);
     expect(payload.status).toBe('doing');
   });
