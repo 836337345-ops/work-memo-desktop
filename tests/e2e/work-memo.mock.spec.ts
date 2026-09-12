@@ -996,3 +996,32 @@ test.describe('工作备忘录 V2.8 独立验收', () => {
     expect(payload.dateFilters).toEqual(['today']);
   });
 });
+
+test.describe('工作备忘录 V2.12 验收修复', () => {
+  test('启动日历可按状态筛选；离开日历后星标和跟进自动保存可用', async ({ page }) => {
+    const state = structuredClone(seed);
+    state.items[0].isStarred = false;
+    state.items[1].isStarred = true;
+    await mockIpc(page, state);
+    await page.goto('/');
+
+    await expect(page.locator('.work-calendar')).toBeVisible();
+    await page.getByLabel('已完成').check();
+    const calendar = page.locator('.work-calendar');
+    await expect(calendar.getByText('已完成活动复盘', { exact: true }).first()).toBeVisible();
+    await expect(calendar.getByText('样板间开放推广', { exact: true })).toHaveCount(0);
+
+    await page.locator('.sidebar-show-all').click();
+    const card = page.getByRole('article', { name: '事项：样板间开放推广' });
+    await expect(card).toBeVisible();
+    await card.getByRole('button', { name: '重要事项', exact: true }).click();
+    await expect(card.getByLabel('已星标')).toBeVisible();
+    await expect.poll(async () => page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'update_item').at(-1)?.payload.input.isStarred)).toBe(true);
+
+    await card.getByRole('button', { name: '展开事项' }).click();
+    await card.getByLabel('完成：确认渠道海报尺寸').check();
+    await expect(card.locator('.item-card__follow-up-done')).toHaveText('已完成');
+    await card.getByRole('button', { name: '收起事项' }).click();
+    await expect.poll(async () => page.evaluate(() => (window as any).__QA_IPC_CALLS__.filter((call: any) => call.command === 'update_item').at(-1)?.payload.input.followUps[0].done)).toBe(true);
+  });
+});
