@@ -7,8 +7,8 @@
 | T120 | PM｜冻结 V2.12 需求、基线和公共契约 | integration/v2 | 已完成 |
 | T121 | 开发员｜实现六项确认需求及数据兼容 | codex/v212-calendar-star-followup | 已完成并集成（d4a97c1） |
 | T122 | 独立测试员｜V2.12 固定集成提交验收 | codex/v212-independent-qa | 已通过（5c52dc0，集成 f81e634） |
-| T123 | PM｜审查、一次集成与用户验收协调 | integration/v2 | 独立 QA 通过，待用户调试验收 |
-| T124 | 原开发员｜V2.12 验收反馈修复 | codex/v212-calendar-star-followup | 已交付（9341722、c57db9a），待 PM 集成 |
+| T123 | PM｜审查、一次集成与用户验收协调 | integration/v2 | 第二轮独立 QA 通过，待用户调试验收 |
+| T124 | 原开发员｜V2.12 验收反馈修复 | codex/v212-calendar-star-followup | 已完成并集成（7a08742） |
 | T125 | 独立测试员｜V2.12 验收修复固定提交验收 | codex/v212-independent-qa | 旧窗口口径冲突，已停止并保留报告 |
 | T126 | 全新独立测试员｜V2.12 当前契约复验 | 独立工作树 186e | 已通过（474726e，集成 562f5b1） |
 | T127 | 原开发员｜V2.12 第二轮验收修复 | codex/v212-calendar-star-followup | 已完成并集成（a01e137） |
