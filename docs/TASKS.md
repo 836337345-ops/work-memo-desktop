@@ -8,7 +8,7 @@
 | T121 | 开发员｜实现六项确认需求及数据兼容 | codex/v212-calendar-star-followup | 已完成并集成（d4a97c1） |
 | T122 | 独立测试员｜V2.12 固定集成提交验收 | codex/v212-independent-qa | 已通过（5c52dc0，集成 f81e634） |
 | T123 | PM｜审查、一次集成与用户验收协调 | integration/v2 | 独立 QA 通过，待用户调试验收 |
-| T124 | 原开发员｜V2.12 验收反馈修复 | codex/v212-calendar-star-followup | 需求已确认，待续派与启动验真 |
+| T124 | 原开发员｜V2.12 验收反馈修复 | codex/v212-calendar-star-followup | 已交付（9341722、c57db9a），待 PM 集成 |
 
 任务卡见 `docs/TASK-V2.12.md`。本轮不生成安装包、不修改 `main`、不上传或发布；用户调试验收通过后仍需另行明确授权打包。
 
