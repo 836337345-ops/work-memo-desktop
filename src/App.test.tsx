@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { api } from './api';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
+import { confirm } from '@tauri-apps/plugin-dialog';
 
 const { appWindow } = vi.hoisted(() => ({ appWindow: { onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn(), setTitle: vi.fn(() => Promise.resolve()) } }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => appWindow) }));
 vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn(), restoreItem: vi.fn(), permanentlyDeleteItems: vi.fn() } }));
 vi.mock('@tauri-apps/plugin-autostart', () => ({ isEnabled: vi.fn(), enable: vi.fn(), disable: vi.fn() }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ confirm: vi.fn() }));
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -19,6 +21,7 @@ beforeEach(() => {
   vi.mocked(isEnabled).mockResolvedValue(false);
   vi.mocked(enable).mockResolvedValue();
   vi.mocked(disable).mockResolvedValue();
+  vi.mocked(confirm).mockResolvedValue(true);
 });
 
 describe('App 开机自启动', () => {
@@ -251,6 +254,23 @@ describe('App 工作日历入口', () => {
 });
 
 describe('App 回收站还原', () => {
+  it('只删除当前搜索结果中勾选的回收站事项，原生确认取消不会调用删除接口', async () => {
+    const trash = (id: string, title: string) => ({ id, title, content: '', categoryId: null, dueDate: null, status: 'doing' as const, notes: '', followUps: [], isStarred: false, progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: '2026-09-02T00:00:00Z' });
+    vi.mocked(api.listItems).mockResolvedValue([trash('trash-1', '匹配事项'), trash('trash-2', '未选事项')]);
+    vi.mocked(confirm).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: '回收站' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 匹配事项' }));
+    const remove = screen.getByRole('button', { name: '永久删除所选' });
+    fireEvent.click(remove);
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('1 条事项'), expect.objectContaining({ title: '永久删除事项' })));
+    expect(api.permanentlyDeleteItems).not.toHaveBeenCalled();
+    fireEvent.click(remove);
+    await waitFor(() => expect(api.permanentlyDeleteItems).toHaveBeenCalledWith(['trash-1']));
+    expect(screen.queryByText('匹配事项')).toBeNull();
+    expect(screen.getByText('未选事项')).toBeTruthy();
+  });
+
   it('还原后回到原列表，不会打开新建编辑栏', async () => {
     const deletedItem = { id: 'trash-1', title: '待还原事项', content: '', categoryId: null, dueDate: '2026-09-12', status: 'doing' as const, notes: '', followUps: [], isStarred: false, progress: [], createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-01T00:00:00Z', deletedAt: '2026-09-02T00:00:00Z' };
     vi.mocked(api.listItems).mockResolvedValue([deletedItem]);
