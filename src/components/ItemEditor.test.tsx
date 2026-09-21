@@ -52,6 +52,18 @@ describe('V2.8 ItemEditor', () => {
     expect((screen.getByLabelText('截止日期') as HTMLInputElement).value).toBe('2025-01-02');
   });
 
+  it('日历预填日期不触发放弃确认，实际填写后只确认一次', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ItemEditor {...props} item={null} defaultDueDate="2026-09-07" />);
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(confirm).not.toHaveBeenCalled(); await waitFor(() => expect(props.onCancel).toHaveBeenCalledTimes(1));
+    cleanup(); vi.clearAllMocks(); confirm.mockReturnValue(true);
+    render(<ItemEditor {...props} item={null} defaultDueDate="2026-09-07" />);
+    fireEvent.change(screen.getByLabelText(/事项标题/), { target: { value: '用户填写内容' } });
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(confirm).toHaveBeenCalledTimes(1); await waitFor(() => expect(props.onCancel).toHaveBeenCalledTimes(1));
+  });
+
   it('只显示约定的编辑字段，隐藏状态和进度记录，但保存时保留既有状态', async () => {
     vi.mocked(api.updateItem).mockImplementation(async (_id, input) => savedItem(input));
     render(<ItemEditor {...props} />);

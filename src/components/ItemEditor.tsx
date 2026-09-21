@@ -7,7 +7,7 @@ import './editor.css';
 const makeId = (prefix: string) => globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })), isStarred: item.isStarred });
 const initialDraft = (item: ItemInput | null, defaultCategoryId: string | null, defaultDueDate: string | null): ItemInput => item ? toInput(item) : { ...emptyItem(defaultCategoryId), dueDate: defaultDueDate ?? null };
-const hasDraft = (item: ItemInput) => Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.dueDate || item.followUps.some((followUp) => followUp.text.trim()));
+const hasDraft = (item: ItemInput) => Boolean(item.title.trim() || item.content.trim() || item.notes.trim() || item.followUps.some((followUp) => followUp.text.trim()));
 const forSaving = (item: ItemInput): ItemInput => ({ ...item, followUps: item.followUps.filter((followUp) => followUp.text.trim()) });
 
 const ItemEditor = forwardRef<EditorHandle, ItemEditorProps>(function ItemEditor({ item, categories, defaultCategoryId = null, defaultDueDate = null, onSaved, onDeleted, onCancel }, ref) {
