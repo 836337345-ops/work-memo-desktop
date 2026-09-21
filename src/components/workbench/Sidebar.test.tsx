@@ -85,6 +85,15 @@ describe('V2.13 左栏分类', () => {
     expect(api.deleteCategory).not.toHaveBeenCalled();
   });
 
+  it('改名和删除操作不会误触拖拽排序', async () => {
+    setup(); openCategories(); const row = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement;
+    vi.mocked(api.renameCategory).mockResolvedValue([{ id: 'promotion', name: '市场推广', sortOrder: 0 }, categories[1]]);
+    fireEvent.click(row.querySelector('.category-rename') as HTMLButtonElement); fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '市场推广' } }); fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(api.renameCategory).toHaveBeenCalledWith('promotion', '市场推广'));
+    vi.mocked(confirm).mockResolvedValueOnce(false); fireEvent.click(row.querySelector('.danger-text') as HTMLButtonElement);
+    await waitFor(() => expect(confirm).toHaveBeenCalled()); expect(api.reorderCategories).not.toHaveBeenCalled();
+  });
+
   it('空白分类不提交，展开状态具备可访问标记', () => {
     setup();
     const status = screen.getByRole('button', { name: /^进度/ });
