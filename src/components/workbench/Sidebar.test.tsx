@@ -7,20 +7,18 @@ import { Sidebar } from './Sidebar';
 
 vi.mock('../../api', () => ({ api: { createCategory: vi.fn(), renameCategory: vi.fn(), deleteCategory: vi.fn(), reorderCategories: vi.fn() } }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ confirm: vi.fn() }));
-
-const setup = (categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }]) => {
+const categories = [{ id: 'promotion', name: '推广', sortOrder: 0 }, { id: 'customer', name: '客户', sortOrder: 1 }];
+const setup = (inputCategories = categories) => {
+  const categories = inputCategories;
   const props = { categories, workbenchName: '工作台', filters: { status: 'all' as const, date: 'all' as const, categoryId: undefined }, trash: false, calendar: false, onDateFilter: vi.fn(), onCategory: vi.fn(), onStatus: vi.fn(), onTrash: vi.fn(), onShowAll: vi.fn(), onShowDoing: vi.fn(), onOpenCalendar: vi.fn(), onBeforeCategoryChange: vi.fn().mockResolvedValue(true), onCategoriesChanged: vi.fn().mockResolvedValue(undefined), onOpenBackup: vi.fn(), onOpenExport: vi.fn(), onOpenWorkbenchNameSettings: vi.fn(), autostartEnabled: false, autostartReady: true, autostartBusy: false, autostartError: '', onToggleAutostart: vi.fn() };
   render(<Sidebar {...props} />); return props;
 };
+const openCategories = () => fireEvent.click(screen.getByRole('button', { name: /^分类/ }));
 afterEach(cleanup); beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); vi.mocked(confirm).mockResolvedValue(true); });
 
-describe('V2.13 左栏', () => {
-  it('提供工作列表、进度筛选和日历入口', () => {
-    const props = setup();
-    expect(screen.queryByRole('button', { name: '全部' })).toBeNull();
-    expect(document.querySelector('.sidebar-show-doing')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '工作列表' }));
-    fireEvent.click(screen.getByRole('button', { name: '全部进度' }));
+describe('V2.13 左栏分类', () => {
+  it('保留工作列表和进度筛选', () => {
+    const props = setup(); fireEvent.click(screen.getByRole('button', { name: '工作列表' })); fireEvent.click(screen.getByRole('button', { name: '全部进度' }));
     expect(props.onShowAll).toHaveBeenCalledTimes(1); expect(props.onStatus).toHaveBeenCalledWith('all');
   });
 
@@ -40,35 +38,45 @@ describe('V2.13 左栏', () => {
     expect(props.onToggleAutostart).toHaveBeenCalledTimes(1);
   });
 
-  it('在分类区域直接新增、改名和删除', async () => {
-    const props = setup();
-    fireEvent.click(screen.getByRole('button', { name: '新增分类' }));
-    fireEvent.change(screen.getByLabelText('新分类名称'), { target: { value: '客户' } });
-    vi.mocked(api.createCategory).mockResolvedValue([{ id: 'promotion', name: '推广', sortOrder: 0 }, { id: 'customer', name: '客户', sortOrder: 1 }]);
-    fireEvent.click(screen.getByRole('button', { name: '添加' }));
-    await waitFor(() => expect(api.createCategory).toHaveBeenCalledWith('客户'));
-    fireEvent.click(screen.getByRole('button', { name: '改名' }));
-    fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '市场推广' } });
-    vi.mocked(api.renameCategory).mockResolvedValue([{ id: 'promotion', name: '市场推广', sortOrder: 0 }]);
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
-    await waitFor(() => expect(api.renameCategory).toHaveBeenCalledWith('promotion', '市场推广'));
-    vi.mocked(api.deleteCategory).mockResolvedValue([]);
-    fireEvent.click(screen.getByRole('button', { name: '删除' }));
-    await waitFor(() => expect(confirm).toHaveBeenCalled());
-    await waitFor(() => expect(api.deleteCategory).toHaveBeenCalledWith('promotion'));
-    expect(props.onCategoriesChanged).toHaveBeenCalled();
+  it('新增入口只打开对话框，取消不保留输入，成功后关闭', async () => {
+    setup(); openCategories(); expect(screen.queryByLabelText('新分类名称')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '新增分类' })); fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '新分类' } }); fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('dialog')).toBeNull(); fireEvent.click(screen.getByRole('button', { name: '新增分类' })); expect((screen.getByLabelText('分类名称') as HTMLInputElement).value).toBe('');
+    vi.mocked(api.createCategory).mockResolvedValue([...categories, { id: 'new', name: '新分类', sortOrder: 2 }]); fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '新分类' } }); fireEvent.click(screen.getByRole('button', { name: '添加' }));
+    await waitFor(() => expect(api.createCategory).toHaveBeenCalledWith('新分类')); await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
-  it('分类删除取消不调用接口；排序只提交稳定 ID 顺序', async () => {
-    setup([{ id: 'promotion', name: '推广', sortOrder: 0 }, { id: 'customer', name: '客户', sortOrder: 1 }]);
-    fireEvent.click(screen.getByRole('button', { name: '新增分类' }));
+  it('新增失败保留输入和中文错误', async () => {
+    setup(); fireEvent.click(screen.getByRole('button', { name: '新增分类' })); vi.mocked(api.createCategory).mockRejectedValue(new Error('分类名称不能重复。')); fireEvent.change(screen.getByLabelText('分类名称'), { target: { value: '推广' } }); fireEvent.click(screen.getByRole('button', { name: '添加' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('分类名称不能重复'); expect((screen.getByLabelText('分类名称') as HTMLInputElement).value).toBe('推广');
+  });
+
+  it('同一行提供改名、删除和拖拽把手，筛选点击不触发拖拽', () => {
+    const props = setup(); openCategories(); const row = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement;
+    expect(row.querySelector('.category-drag-handle')).toBeTruthy(); expect(row.textContent).toContain('改名'); expect(row.textContent).toContain('删除'); expect(row.textContent).not.toContain('↑');
+    fireEvent.click(screen.getByText('推广')); expect(props.onCategory).toHaveBeenCalledWith('promotion'); expect(api.reorderCategories).not.toHaveBeenCalled();
+    expect(row.querySelector('.category-rename')).toBeTruthy(); expect(row.querySelector('.danger-text')).toBeTruthy();
+  });
+
+  it('拖拽把手提供预览并仅在目标改变时保存排序', async () => {
+    const props = setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement;
+    fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); expect(second.className).toContain('is-drag-over'); fireEvent.drop(second);
+    await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion'])); expect(props.onCategoriesChanged).toHaveBeenCalled();
+    vi.clearAllMocks(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragEnd(handle); expect(api.reorderCategories).not.toHaveBeenCalled(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.drop(first); expect(api.reorderCategories).not.toHaveBeenCalled();
+  });
+
+  it('排序失败保持原顺序并显示错误', async () => {
+    setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; vi.mocked(api.reorderCategories).mockRejectedValue(new Error('排序保存失败。'));
+    fireEvent.dragStart(first.querySelector('.category-drag-handle') as HTMLButtonElement, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); fireEvent.drop(second);
+    expect((await screen.findByRole('alert')).textContent).toContain('排序保存失败'); expect(Array.from(document.querySelectorAll('.sidebar-category-row .nav-link')).map((node) => node.textContent)).toEqual(['推广', '客户']);
+  });
+
+  it('分类删除取消不调用接口', async () => {
+    setup(); openCategories();
     vi.mocked(confirm).mockResolvedValueOnce(false);
     fireEvent.click(screen.getByText('推广').closest('.sidebar-category-row')!.querySelector('.danger-text') as HTMLButtonElement);
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
     expect(api.deleteCategory).not.toHaveBeenCalled();
-    vi.mocked(api.reorderCategories).mockResolvedValue([{ id: 'customer', name: '客户', sortOrder: 0 }, { id: 'promotion', name: '推广', sortOrder: 1 }]);
-    fireEvent.click(screen.getByRole('button', { name: '下移 推广' }));
-    await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion']));
   });
 
   it('空白分类不提交，展开状态具备可访问标记', () => {
