@@ -8,6 +8,7 @@ export const api = {
   addProgress: (id: string, content: string) => invoke<WorkItem>('add_progress', { id, content }),
   trashItem: (id: string) => invoke<void>('trash_item', { id }),
   restoreItem: (id: string) => invoke<WorkItem>('restore_item', { id }),
+  permanentlyDeleteItems: (ids: string[]) => invoke<void>('permanently_delete_items', { ids }),
   createCategory: (name: string) => invoke<Category[]>('create_category', { name }),
   renameCategory: (id: string, name: string) => invoke<Category[]>('rename_category', { id, name }),
   deleteCategory: (id: string) => invoke<Category[]>('delete_category', { id }),

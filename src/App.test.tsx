@@ -7,7 +7,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 const { appWindow } = vi.hoisted(() => ({ appWindow: { onCloseRequested: vi.fn(() => Promise.resolve(() => undefined)), close: vi.fn(), setTitle: vi.fn(() => Promise.resolve()) } }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: vi.fn(() => appWindow) }));
-vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn(), restoreItem: vi.fn() } }));
+vi.mock('./api', () => ({ api: { listItems: vi.fn(), listCategories: vi.fn(), restoreItem: vi.fn(), permanentlyDeleteItems: vi.fn() } }));
 vi.mock('@tauri-apps/plugin-autostart', () => ({ isEnabled: vi.fn(), enable: vi.fn(), disable: vi.fn() }));
 
 afterEach(cleanup);
@@ -190,13 +190,13 @@ describe('App 工作日历入口', () => {
     render(<App />);
     const month = new Date();
     expect(await screen.findByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy();
-    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
+    fireEvent.click(screen.getByRole('button', { name: '进行中' }));
     expect(await screen.findByRole('heading', { name: '进行中' })).toBeTruthy();
     const search = screen.getByPlaceholderText('搜索标题、内容、进度、跟进或备注') as HTMLInputElement;
     fireEvent.change(search, { target: { value: '临时关键词' } });
     fireEvent.click(document.querySelector('.sidebar-show-all') as HTMLButtonElement);
     await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
-    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
+    fireEvent.click(screen.getByRole('button', { name: '进行中' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
     expect(search.value).toBe('');
   });
@@ -213,7 +213,7 @@ describe('App 工作日历入口', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: '全部事项' })).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: '工作日历' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: `${month.getFullYear()}年${month.getMonth() + 1}月` })).toBeTruthy());
-    fireEvent.click(document.querySelector('.sidebar-show-doing') as HTMLButtonElement);
+    fireEvent.click(screen.getByRole('button', { name: '进行中' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '进行中' })).toBeTruthy());
   });
 

@@ -202,7 +202,7 @@ fn valid_input(v: &Input) -> R<Input> {
         status: v.status.clone(),
         notes: v.notes.clone(),
         follow_ups,
-        is_starred: v.is_starred,
+        is_starred: v.is_starred && v.status != "done",
     })
 }
 fn row_item(r: &rusqlite::Row) -> rusqlite::Result<Item> {
@@ -569,6 +569,31 @@ impl Store {
             return Err(fail("未找到对应事项。"));
         };
         self.detail(id)
+    }
+    fn permanently_delete(&mut self, ids: &[String]) -> R<()> {
+        if ids.is_empty() {
+            return Err(fail("请至少选择一条回收站事项。"));
+        }
+        let mut unique = HashSet::new();
+        for id in ids {
+            check_id(id, "事项")?;
+            if !unique.insert(id) {
+                return Err(fail("事项不能重复选择。"));
+            }
+        }
+        let tx = self.c.transaction().map_err(|_| fail("无法开始永久删除。"))?;
+        for id in ids {
+            let deleted: Option<String> = tx.query_row("SELECT deleted_at FROM items WHERE id=?", [id], |row| row.get(0)).optional().map_err(|_| fail("无法验证回收站事项。"))?;
+            if deleted.is_none() {
+                return Err(fail("只能永久删除回收站中的事项。"));
+            }
+        }
+        for id in ids {
+            tx.execute("DELETE FROM follow_ups WHERE item_id=?", [id]).map_err(|_| fail("无法永久删除跟进清单。"))?;
+            tx.execute("DELETE FROM progress_entries WHERE item_id=?", [id]).map_err(|_| fail("无法永久删除进度。"))?;
+            tx.execute("DELETE FROM items WHERE id=?", [id]).map_err(|_| fail("无法永久删除事项。"))?;
+        }
+        tx.commit().map_err(|_| fail("无法永久删除事项。"))
     }
     fn cat_new(&mut self, name: &str) -> R<Vec<Category>> {
         let name = text(name, "分类名称", 50, true)?;
@@ -1190,6 +1215,11 @@ fn restore_item(s: State<'_, AppState>, id: String) -> R<Item> {
     st.trash(&id, false)
 }
 #[tauri::command]
+fn permanently_delete_items(s: State<'_, AppState>, ids: Vec<String>) -> R<()> {
+    let mut st = store(&s)?;
+    st.permanently_delete(&ids)
+}
+#[tauri::command]
 fn create_category(s: State<'_, AppState>, name: String) -> R<Vec<Category>> {
     let mut st = store(&s)?;
     st.cat_new(&name)
@@ -1284,6 +1314,7 @@ pub fn run() {
         add_progress,
         trash_item,
         restore_item,
+        permanently_delete_items,
         create_category,
         rename_category,
         delete_category,
@@ -1768,6 +1799,47 @@ mod export_tests {
         let mut missing_category = export_input(output);
         missing_category.category_ids.push(Some("gone".into()));
         assert!(export_txt_at(&store, &missing_category, day("2026-09-06")).is_err());
+    }
+
+    #[test]
+    fn permanently_delete_only_removes_selected_trash_and_its_records() {
+        let dir = tempdir().unwrap();
+        let mut store = Store::open(dir.path().join("memo.sqlite3")).unwrap();
+        let mut input = item("待永久删除", None, None, "doing");
+        input.follow_ups.push(FollowUp { id: Uuid::new_v4().to_string(), text: "跟进".into(), done: false });
+        let removed = store.create(input).unwrap();
+        store.progress_add(&removed.id, "进度").unwrap();
+        store.trash(&removed.id, true).unwrap();
+        let kept = store.create(item("正常事项", None, None, "doing")).unwrap();
+        assert!(store.permanently_delete(&[removed.id.clone()]).is_ok());
+        assert!(store.detail(&removed.id).is_err());
+        assert!(store.detail(&kept.id).is_ok());
+        assert_eq!(store.c.query_row("SELECT COUNT(*) FROM follow_ups WHERE item_id=?", [&removed.id], |row| row.get::<_, i64>(0)).unwrap(), 0);
+        assert_eq!(store.c.query_row("SELECT COUNT(*) FROM progress_entries WHERE item_id=?", [&removed.id], |row| row.get::<_, i64>(0)).unwrap(), 0);
+    }
+
+    #[test]
+    fn permanently_delete_rejects_normal_items_without_partial_changes() {
+        let dir = tempdir().unwrap();
+        let mut store = Store::open(dir.path().join("memo.sqlite3")).unwrap();
+        let trash = store.create(item("回收站事项", None, None, "doing")).unwrap();
+        store.trash(&trash.id, true).unwrap();
+        let normal = store.create(item("正常事项", None, None, "doing")).unwrap();
+        assert!(store.permanently_delete(&[trash.id.clone(), normal.id]).is_err());
+        assert!(store.detail(&trash.id).is_ok());
+    }
+
+    #[test]
+    fn done_items_cannot_keep_a_starred_flag() {
+        let dir = tempdir().unwrap();
+        let mut store = Store::open(dir.path().join("memo.sqlite3")).unwrap();
+        let mut input = item("完成事项", None, None, "done");
+        input.is_starred = true;
+        let saved = store.create(input).unwrap();
+        assert!(!saved.input.is_starred);
+        let mut update = item("完成事项", None, None, "done");
+        update.is_starred = true;
+        assert!(!store.update(&saved.id, update).unwrap().input.is_starred);
     }
 
     #[test]

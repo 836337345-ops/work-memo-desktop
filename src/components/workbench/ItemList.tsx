@@ -16,6 +16,8 @@ interface ItemListProps {
   onRestore?: (item: WorkItem) => void;
   editingItemId?: string | null;
   revealItemId?: string | null;
+  selectedIds?: Set<string>;
+  onToggleSelected?: (id: string) => void;
 }
 
 const toInput = (item: ItemInput): ItemInput => ({ title: item.title, content: item.content, categoryId: item.categoryId, dueDate: item.dueDate, status: item.status, notes: item.notes, followUps: item.followUps.map((entry) => ({ ...entry })), isStarred: item.isStarred });
@@ -30,10 +32,10 @@ function CollapseIcon({ expanded }: { expanded: boolean }) {
 
 interface CardHandle { prepareLeave: () => Promise<boolean> }
 
-function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister, onElementRegister, revealed = false, revealVersion = 0 }: {
+function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged, onError, onRestore, onRegister, onElementRegister, revealed = false, revealVersion = 0, selectedForDeletion = false, onToggleSelected }: {
   item: WorkItem; categoryName: string; selected: boolean; readOnly: boolean; onSelect: () => void;
   onChanged?: (item: WorkItem) => void; onError?: (message: string, kind: 'normal' | 'progress') => void; onRestore?: () => void; onRegister: (handle: CardHandle | null) => void;
-  onElementRegister: (element: HTMLElement | null) => void; revealed?: boolean; revealVersion?: number;
+  onElementRegister: (element: HTMLElement | null) => void; revealed?: boolean; revealVersion?: number; selectedForDeletion?: boolean; onToggleSelected?: () => void;
 }) {
   const [draft, setDraft] = useState<ItemInput>(() => toInput(item));
   const [progress, setProgress] = useState(item.progress);
@@ -116,7 +118,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
     writeChainRef.current = writeChainRef.current.then(save, save);
   };
 
-  const update = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => enqueueUpdate({ ...draftRef.current, [field]: value });
+  const update = <K extends keyof ItemInput>(field: K, value: ItemInput[K]) => enqueueUpdate(field === 'status' && value === 'done' ? { ...draftRef.current, status: value, isStarred: false } : { ...draftRef.current, [field]: value });
   const updateFollowUps = (followUps: FollowUp[]) => { const next = { ...draftRef.current, followUps }; draftRef.current = next; setDraft(next); setNormalError(null); };
   const followUpsDirty = () => JSON.stringify(draftRef.current.followUps) !== JSON.stringify(savedFollowUpsRef.current);
   const saveFollowUps = async () => {
@@ -185,10 +187,10 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   return <li className={selected ? 'item-row selected' : 'item-row'}>
     <article ref={onElementRegister} className={revealed ? 'item-card is-revealed' : 'item-card'} aria-label={`事项：${item.title}`} onBlur={(event) => { if (!readOnly && !event.currentTarget.contains(event.relatedTarget as Node | null)) void prepareFollowUps(); }}>
       <header className="item-card__header">
-        <button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => void toggleExpanded()}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />{draft.isStarred && <span className="item-card__star" aria-label="已星标">★</span>}
+        {onToggleSelected && <input type="checkbox" aria-label={`选择 ${item.title}`} checked={selectedForDeletion} onChange={onToggleSelected} />}<button type="button" className="item-card__expand" aria-label={expanded ? '收起事项' : '展开事项'} aria-expanded={expanded} onClick={() => void toggleExpanded()}><CollapseIcon expanded={expanded} /></button><span className={`status-dot ${draft.status}`} aria-hidden="true" />{draft.isStarred && draft.status !== 'done' && <span className="item-card__star" aria-label="已星标">★</span>}
         <div className="item-copy"><span className="item-card__date">{formatChineseDate(item.dueDate)}</span><i aria-hidden="true"> | </i><span className="item-card__category">{categoryName}</span><i aria-hidden="true"> | </i><strong>{draft.title}{isOverdue(item) && <em className="item-card__overdue">逾期</em>}</strong></div>
         <select className="item-card__status" aria-label={`${item.title}的状态`} value={draft.status} disabled={readOnly} onChange={(event) => update('status', event.target.value as ItemStatus)}>{(Object.keys(STATUS_LABELS) as ItemStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select>
-        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <><button type="button" className="restore-button" onClick={onSelect}>修改编辑</button><button type="button" className="restore-button item-card__delete" onClick={() => void remove()}>删除</button><button type="button" className="restore-button item-card__important" onClick={() => update('isStarred', !draft.isStarred)}>{draft.isStarred ? '取消重要事项' : '设置重要事项'}</button></>}
+        {onRestore ? <button type="button" className="restore-button" onClick={onRestore}>还原</button> : readOnly ? <span className="restore-button" aria-label="详情编辑中">详情编辑中</span> : <><button type="button" className="restore-button" onClick={onSelect}>修改编辑</button><button type="button" className="restore-button item-card__delete" onClick={() => void remove()}>删除</button>{draft.status !== 'done' && <button type="button" className="restore-button item-card__important" onClick={() => update('isStarred', !draft.isStarred)}>{draft.isStarred ? '取消重要事项' : '设置重要事项'}</button>}</>}
       </header>
       <div className="item-card__body">
         <section className="item-card__progress" aria-label="最新进度" onClick={(event) => { if (!readOnly && !(event.target as HTMLElement).closest('textarea,button')) setProgressInputVisible((visible) => !visible); }}><b>最新进度</b><p className="item-card__progress-full">{progress[0]?.content ?? '暂无最新进度'}</p>{!readOnly && progressInputVisible && <div><label className="sr-only" htmlFor={`progress-${item.id}`}>新增进度</label><textarea id={`progress-${item.id}`} value={progressText} disabled={progressSaving} onChange={(event) => setProgressText(event.target.value)} placeholder="记录新的进展" rows={2} /><button type="button" className="secondary-button" disabled={progressSaving || !progressText.trim()} onClick={() => void submitProgress()}>提交新进度</button></div>}</section>
@@ -199,7 +201,7 @@ function ItemCard({ item, categoryName, selected, readOnly, onSelect, onChanged,
   </li>;
 }
 
-export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore, editingItemId = null, revealItemId = null }, ref) {
+export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemList({ items, categories, selectedId, onSelect, onChanged, onError, onRestore, editingItemId = null, revealItemId = null, selectedIds, onToggleSelected }, ref) {
   const cardHandlesRef = useRef(new Map<string, CardHandle>());
   const cardElementsRef = useRef(new Map<string, HTMLElement>());
   const revealVersionRef = useRef(0);
@@ -233,6 +235,6 @@ export const ItemList = forwardRef<ItemListHandle, ItemListProps>(function ItemL
   const categoryName = (id: string | null) => categories.find((category) => category.id === id)?.name ?? '未分类';
   if (!items.length) return <div className="empty-state"><span>☷</span><h2>这里还没有事项</h2><p>{onRestore ? '回收站为空。删除的事项会暂存在这里。' : '新建一条事项，开始安排接下来的工作。'}</p></div>;
   return <ul className="item-list" aria-label="事项列表">
-    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore) || item.id === editingItemId} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} onRegister={(handle) => registerCard(item.id, handle)} onElementRegister={(element) => registerCardElement(item.id, element)} revealed={revealRequest?.id === item.id} revealVersion={revealRequest?.id === item.id ? revealRequest.version : 0} />)}
+    {items.map((item) => <ItemCard key={item.id} item={item} categoryName={categoryName(item.categoryId)} selected={item.id === selectedId} readOnly={Boolean(onRestore) || item.id === editingItemId} onSelect={() => onSelect(item)} onChanged={onChanged} onError={onError} onRestore={onRestore ? () => onRestore(item) : undefined} onRegister={(handle) => registerCard(item.id, handle)} onElementRegister={(element) => registerCardElement(item.id, element)} revealed={revealRequest?.id === item.id} revealVersion={revealRequest?.id === item.id ? revealRequest.version : 0} selectedForDeletion={selectedIds?.has(item.id)} onToggleSelected={onToggleSelected ? () => onToggleSelected(item.id) : undefined} />)}
   </ul>;
 });
