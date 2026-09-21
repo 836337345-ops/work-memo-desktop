@@ -18,7 +18,7 @@
 .sidebar-group-options .nav-link { padding-top: 6px; padding-bottom: 6px; }
 .sidebar-category-row { display: flex; min-width: 0; align-items: center; border-radius: var(--radius-sm); }
 .sidebar-category-row > .nav-link, .sidebar-category-row > input { min-width: 0; flex: 1; }
-.sidebar-category-row.is-drag-over { box-shadow: inset 0 2px #2563eb; background: #eff6ff; }
+.sidebar-category-row.is-drag-before { box-shadow: inset 0 2px #2563eb; background: #eff6ff; }.sidebar-category-row.is-drag-after { box-shadow: inset 0 -2px #2563eb; background: #eff6ff; }
 .category-actions { display: flex; flex: none; align-items: center; gap: 2px; }
 .category-actions button { border: 0; border-radius: var(--radius-sm); padding: 4px 5px; background: transparent; font-size: 12px; cursor: pointer; }
 .category-drag-handle { color: var(--muted-foreground); cursor: grab !important; letter-spacing: -2px; touch-action: none; }

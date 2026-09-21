@@ -53,16 +53,22 @@ describe('V2.13 左栏分类', () => {
 
   it('同一行提供改名、删除和拖拽把手，筛选点击不触发拖拽', () => {
     const props = setup(); openCategories(); const row = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement;
-    expect(row.querySelector('.category-drag-handle')).toBeTruthy(); expect(row.textContent).toContain('改名'); expect(row.textContent).toContain('删除'); expect(row.textContent).not.toContain('↑');
+    expect(row.firstElementChild?.className).toContain('category-drag-handle'); expect(row.lastElementChild?.className).toContain('category-actions'); expect(row.textContent).toContain('改名'); expect(row.textContent).toContain('删除'); expect(row.textContent).not.toContain('↑');
     fireEvent.click(screen.getByText('推广')); expect(props.onCategory).toHaveBeenCalledWith('promotion'); expect(api.reorderCategories).not.toHaveBeenCalled();
     expect(row.querySelector('.category-rename')).toBeTruthy(); expect(row.querySelector('.danger-text')).toBeTruthy();
   });
 
-  it('拖拽把手提供预览并仅在目标改变时保存排序', async () => {
+  it('向下拖拽预览和最终排序均放在目标后方', async () => {
     const props = setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement;
-    fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); expect(second.className).toContain('is-drag-over'); fireEvent.drop(second);
+    fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); expect(second.className).toContain('is-drag-after'); fireEvent.drop(second);
     await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion'])); expect(props.onCategoriesChanged).toHaveBeenCalled();
     vi.clearAllMocks(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragEnd(handle); expect(api.reorderCategories).not.toHaveBeenCalled(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.drop(first); expect(api.reorderCategories).not.toHaveBeenCalled();
+  });
+
+  it('向上拖拽预览和最终排序均放在目标前方', async () => {
+    setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement;
+    fireEvent.dragStart(second.querySelector('.category-drag-handle') as HTMLButtonElement, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(first); expect(first.className).toContain('is-drag-before'); fireEvent.drop(first);
+    await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion']));
   });
 
   it('排序失败保持原顺序并显示错误', async () => {
