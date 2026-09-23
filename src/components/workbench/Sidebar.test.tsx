@@ -61,6 +61,29 @@ describe('V2.13 左栏分类', () => {
     const css = readFileSync('src/components/workbench/sidebar.css', 'utf8'); expect(css).toMatch(/\.category-actions \{[^}]*gap: 0/); expect(css).toMatch(/\.category-actions button \{[^}]*padding: 4px 2px/); expect(css).toMatch(/\.category-rename \{ color: #2563eb/);
   });
 
+  it('改名输入框失焦保存一次并退出编辑', async () => {
+    setup(); openCategories(); vi.mocked(api.renameCategory).mockResolvedValue(categories);
+    fireEvent.click((screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement).querySelector('.category-rename') as HTMLButtonElement); const input = screen.getByLabelText('分类名称'); fireEvent.change(input, { target: { value: '市场推广' } }); fireEvent.blur(input);
+    await waitFor(() => expect(api.renameCategory).toHaveBeenCalledWith('promotion', '市场推广')); expect(api.renameCategory).toHaveBeenCalledTimes(1); await waitFor(() => expect(screen.queryByLabelText('分类名称')).toBeNull());
+  });
+
+  it('保存按钮和回车仍通过同一保存路径，且不会因失焦重复调用', async () => {
+    setup(); openCategories(); vi.mocked(api.renameCategory).mockResolvedValue(categories);
+    fireEvent.click((screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement).querySelector('.category-rename') as HTMLButtonElement); let input = screen.getByLabelText('分类名称'); fireEvent.change(input, { target: { value: '市场推广' } }); fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect(api.renameCategory).toHaveBeenCalledTimes(1)); await waitFor(() => expect(screen.queryByLabelText('分类名称')).toBeNull());
+    vi.mocked(api.renameCategory).mockClear(); fireEvent.click((screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement).querySelector('.category-rename') as HTMLButtonElement); input = screen.getByLabelText('分类名称'); fireEvent.change(input, { target: { value: '客户推广' } }); fireEvent.keyDown(input, { key: 'Enter' }); fireEvent.blur(input);
+    await waitFor(() => expect(api.renameCategory).toHaveBeenCalledWith('promotion', '客户推广')); expect(api.renameCategory).toHaveBeenCalledTimes(1);
+  });
+
+  it('空名称、重名和保存失败时保留编辑与中文错误', async () => {
+    setup(); openCategories(); fireEvent.click((screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement).querySelector('.category-rename') as HTMLButtonElement); let input = screen.getByLabelText('分类名称'); fireEvent.change(input, { target: { value: ' ' } }); fireEvent.blur(input);
+    expect((await screen.findByRole('alert')).textContent).toContain('请输入分类名称'); expect(screen.getByLabelText('分类名称')).toBeTruthy(); expect(api.renameCategory).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: '客户' } }); vi.mocked(api.renameCategory).mockRejectedValueOnce(new Error('分类名称不能重复。')); fireEvent.blur(input);
+    expect((await screen.findByRole('alert')).textContent).toContain('分类名称不能重复'); expect(screen.getByLabelText('分类名称')).toBeTruthy();
+    input = screen.getByLabelText('分类名称'); fireEvent.change(input, { target: { value: '市场推广' } }); vi.mocked(api.renameCategory).mockRejectedValueOnce(new Error('保存失败。')); fireEvent.blur(input);
+    expect((await screen.findByRole('alert')).textContent).toContain('保存失败'); expect(screen.getByLabelText('分类名称')).toBeTruthy();
+  });
+
   it('Pointer 向下拖拽预览和最终排序均放在目标后方', async () => {
     const props = setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement;
     vi.mocked(document.elementFromPoint).mockReturnValue(second); fireEvent.pointerDown(handle, { pointerId: 1 }); expect(first.className).toContain('is-dragging'); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); expect(first.className).toContain('is-dragging'); expect(second.className).toContain('is-drag-after'); fireEvent.pointerUp(handle, { pointerId: 1 }); expect(first.className).not.toContain('is-dragging'); expect(second.className).not.toContain('is-drag-after');
