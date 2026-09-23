@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error Vitest 在 Node 环境读取样式契约。
+import { readFileSync } from 'node:fs';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { api } from '../../api';
 import { Sidebar } from './Sidebar';
@@ -56,13 +58,14 @@ describe('V2.13 左栏分类', () => {
     expect(row.firstElementChild?.className).toContain('category-drag-handle'); expect(row.querySelector('.category-drag-handle img')).toBeTruthy(); expect(row.lastElementChild?.className).toContain('category-actions'); expect(row.textContent).toContain('改'); expect(row.textContent).toContain('×'); expect(screen.getByRole('button', { name: '删除 推广' })).toBeTruthy();
     fireEvent.click(screen.getByText('推广')); expect(props.onCategory).toHaveBeenCalledWith('promotion'); expect(api.reorderCategories).not.toHaveBeenCalled();
     expect(row.querySelector('.category-rename')).toBeTruthy(); expect(row.querySelector('.danger-text')).toBeTruthy();
+    const css = readFileSync('src/components/workbench/sidebar.css', 'utf8'); expect(css).toMatch(/\.category-actions \{[^}]*gap: 0/); expect(css).toMatch(/\.category-actions button \{[^}]*padding: 4px 2px/); expect(css).toMatch(/\.category-rename \{ color: #2563eb/);
   });
 
   it('Pointer 向下拖拽预览和最终排序均放在目标后方', async () => {
     const props = setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement;
-    vi.mocked(document.elementFromPoint).mockReturnValue(second); fireEvent.pointerDown(handle, { pointerId: 1 }); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); expect(second.className).toContain('is-drag-after'); fireEvent.pointerUp(handle, { pointerId: 1 });
+    vi.mocked(document.elementFromPoint).mockReturnValue(second); fireEvent.pointerDown(handle, { pointerId: 1 }); expect(first.className).toContain('is-dragging'); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); expect(first.className).toContain('is-dragging'); expect(second.className).toContain('is-drag-after'); fireEvent.pointerUp(handle, { pointerId: 1 }); expect(first.className).not.toContain('is-dragging'); expect(second.className).not.toContain('is-drag-after');
     await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion'])); expect(props.onCategoriesChanged).toHaveBeenCalled();
-    vi.clearAllMocks(); fireEvent.pointerDown(handle, { pointerId: 2 }); fireEvent.pointerCancel(handle, { pointerId: 2 }); expect(api.reorderCategories).not.toHaveBeenCalled(); vi.mocked(document.elementFromPoint).mockReturnValue(first); fireEvent.pointerDown(handle, { pointerId: 3 }); fireEvent.pointerMove(handle, { pointerId: 3, clientX: 3, clientY: 3 }); fireEvent.pointerUp(handle, { pointerId: 3 }); expect(api.reorderCategories).not.toHaveBeenCalled();
+    vi.clearAllMocks(); fireEvent.pointerDown(handle, { pointerId: 2 }); expect(first.className).toContain('is-dragging'); fireEvent.pointerCancel(handle, { pointerId: 2 }); expect(first.className).not.toContain('is-dragging'); expect(api.reorderCategories).not.toHaveBeenCalled(); vi.mocked(document.elementFromPoint).mockReturnValue(first); fireEvent.pointerDown(handle, { pointerId: 3 }); fireEvent.pointerMove(handle, { pointerId: 3, clientX: 3, clientY: 3 }); fireEvent.pointerUp(handle, { pointerId: 3 }); expect(api.reorderCategories).not.toHaveBeenCalled();
   });
 
   it('Pointer 向上拖拽预览和最终排序均放在目标前方', async () => {
