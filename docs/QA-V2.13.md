@@ -37,3 +37,10 @@
 - 删除操作显示“×”，并提供“删除 <分类名>”无障碍名称；确认文案及删除语义未变。改名为蓝色“改”，仍支持行内编辑。
 - `src/assets/category-drag-handle.png` 为项目内实际导入的 1254×1254 32 位 ARGB PNG，检测到透明像素；生产构建也输出该资源。
 - 数据层本轮未变，复用前次 `cargo test` 的 18/18 通过结论；本轮重新执行前端完整测试、构建和差异检查。
+
+## 0.1.2 发布 QA
+
+- 固定发布提交：`7e6fbb3da78c2d00c3369eb7607955863b2a5a14`，可在本地解析；发布改动仅包含五处版本声明。
+- `package.json`、`package-lock.json` 根与项目条目、`Cargo.toml`、`Cargo.lock` 的 `work-memo` 条目及 `tauri.conf.json` 均为 `0.1.2`。产品标识仍为 `com.local.workmemo`，NSIS 仍为当前用户安装、仅简体中文且不显示语言选择。
+- 候选包：`工作备忘录_0.1.2_x64-setup.exe`，大小 `3,135,752` bytes，SHA-256 为 `218B54053D76F1FD1E8A6E611BE83CC04F6A38FD9B67A7892C9D15F7BCD106AB`，与记录一致；只读核验 PE 为 `MZ`、文件和产品版本均为 `0.1.2`。Authenticode 状态为 `NotSigned`。
+- 复用同一业务版本的既有独立 QA 和主工作区前端 `120/120`、Rust `18/18`、构建、Tauri 构建与差异检查结论；本发布 QA 未运行安装程序或读取真实用户数据。
