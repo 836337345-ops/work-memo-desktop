@@ -14,7 +14,7 @@ const setup = (inputCategories = categories) => {
   render(<Sidebar {...props} />); return props;
 };
 const openCategories = () => fireEvent.click(screen.getByRole('button', { name: /^分类/ }));
-afterEach(cleanup); beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); vi.mocked(confirm).mockResolvedValue(true); });
+afterEach(cleanup); beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn() }); vi.mocked(confirm).mockResolvedValue(true); });
 
 describe('V2.13 左栏分类', () => {
   it('保留工作列表和进度筛选', () => {
@@ -51,29 +51,29 @@ describe('V2.13 左栏分类', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('分类名称不能重复'); expect((screen.getByLabelText('分类名称') as HTMLInputElement).value).toBe('推广');
   });
 
-  it('同一行提供改名、删除和拖拽把手，筛选点击不触发拖拽', () => {
+  it('同一行提供图片把手、改和×，筛选点击不触发拖拽', () => {
     const props = setup(); openCategories(); const row = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement;
-    expect(row.firstElementChild?.className).toContain('category-drag-handle'); expect(row.lastElementChild?.className).toContain('category-actions'); expect(row.textContent).toContain('改名'); expect(row.textContent).toContain('删除'); expect(row.textContent).not.toContain('↑');
+    expect(row.firstElementChild?.className).toContain('category-drag-handle'); expect(row.querySelector('.category-drag-handle img')).toBeTruthy(); expect(row.lastElementChild?.className).toContain('category-actions'); expect(row.textContent).toContain('改'); expect(row.textContent).toContain('×'); expect(screen.getByRole('button', { name: '删除 推广' })).toBeTruthy();
     fireEvent.click(screen.getByText('推广')); expect(props.onCategory).toHaveBeenCalledWith('promotion'); expect(api.reorderCategories).not.toHaveBeenCalled();
     expect(row.querySelector('.category-rename')).toBeTruthy(); expect(row.querySelector('.danger-text')).toBeTruthy();
   });
 
-  it('向下拖拽预览和最终排序均放在目标后方', async () => {
+  it('Pointer 向下拖拽预览和最终排序均放在目标后方', async () => {
     const props = setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement;
-    fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); expect(second.className).toContain('is-drag-after'); fireEvent.drop(second);
+    vi.mocked(document.elementFromPoint).mockReturnValue(second); fireEvent.pointerDown(handle, { pointerId: 1 }); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); expect(second.className).toContain('is-drag-after'); fireEvent.pointerUp(handle, { pointerId: 1 });
     await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion'])); expect(props.onCategoriesChanged).toHaveBeenCalled();
-    vi.clearAllMocks(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragEnd(handle); expect(api.reorderCategories).not.toHaveBeenCalled(); fireEvent.dragStart(handle, { dataTransfer: { effectAllowed: '' } }); fireEvent.drop(first); expect(api.reorderCategories).not.toHaveBeenCalled();
+    vi.clearAllMocks(); fireEvent.pointerDown(handle, { pointerId: 2 }); fireEvent.pointerCancel(handle, { pointerId: 2 }); expect(api.reorderCategories).not.toHaveBeenCalled(); vi.mocked(document.elementFromPoint).mockReturnValue(first); fireEvent.pointerDown(handle, { pointerId: 3 }); fireEvent.pointerMove(handle, { pointerId: 3, clientX: 3, clientY: 3 }); fireEvent.pointerUp(handle, { pointerId: 3 }); expect(api.reorderCategories).not.toHaveBeenCalled();
   });
 
-  it('向上拖拽预览和最终排序均放在目标前方', async () => {
+  it('Pointer 向上拖拽预览和最终排序均放在目标前方', async () => {
     setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement;
-    fireEvent.dragStart(second.querySelector('.category-drag-handle') as HTMLButtonElement, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(first); expect(first.className).toContain('is-drag-before'); fireEvent.drop(first);
+    vi.mocked(document.elementFromPoint).mockReturnValue(first); const handle = second.querySelector('.category-drag-handle') as HTMLButtonElement; fireEvent.pointerDown(handle, { pointerId: 1 }); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); expect(first.className).toContain('is-drag-before'); fireEvent.pointerUp(handle, { pointerId: 1 });
     await waitFor(() => expect(api.reorderCategories).toHaveBeenCalledWith(['customer', 'promotion']));
   });
 
   it('排序失败保持原顺序并显示错误', async () => {
     setup(); openCategories(); const first = screen.getByText('推广').closest('.sidebar-category-row') as HTMLElement; const second = screen.getByText('客户').closest('.sidebar-category-row') as HTMLElement; vi.mocked(api.reorderCategories).mockRejectedValue(new Error('排序保存失败。'));
-    fireEvent.dragStart(first.querySelector('.category-drag-handle') as HTMLButtonElement, { dataTransfer: { effectAllowed: '' } }); fireEvent.dragOver(second); fireEvent.drop(second);
+    vi.mocked(document.elementFromPoint).mockReturnValue(second); const handle = first.querySelector('.category-drag-handle') as HTMLButtonElement; fireEvent.pointerDown(handle, { pointerId: 1 }); fireEvent.pointerMove(handle, { pointerId: 1, clientX: 3, clientY: 3 }); fireEvent.pointerUp(handle, { pointerId: 1 });
     expect((await screen.findByRole('alert')).textContent).toContain('排序保存失败'); expect(Array.from(document.querySelectorAll('.sidebar-category-row .nav-link')).map((node) => node.textContent)).toEqual(['推广', '客户']);
   });
 
